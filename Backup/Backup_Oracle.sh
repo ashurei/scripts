@@ -1,0 +1,59 @@
+#!/bin/bash
+#################################################
+# Description : Oracle expdp
+# Create DATE : 2019.12.11
+# Last Update DATE : 2020.03.20 by ashurei
+# Copyright (c) Technical Solution, 2020
+#################################################
+
+### Set variable
+################################
+# Need to modify
+export ORACLE_SID="APCS01"
+export ORACLE_HOME="/ORACLE/product/11.2.0"
+BACKDIR="/ORACLE/BACKUP/expdp"
+################################
+DATE=$(date '+%Y%m%d')
+BACKLOG=${BACKDIR}/oracle_expdp_${DATE}.log
+DIR_DUMP="DIR_DUMP"
+DIR_LOG="DIR_LOG"
+OUTPUT="expdp_${ORACLE_SID}_${DATE}"
+
+### Check DB process
+IS_EXIST_DB=$(ps aux | grep "ora_pmon_${ORACLE_SID}" | grep -v grep | wc -l)
+if [ "${IS_EXIST_DB}" -lt 1 ]
+then
+	echo "[DB BACKUP] There is not DB process."
+	exit 1
+fi
+
+### Check directorys
+if [ ! -d "${BACKDIR}/dump" ] || [ ! -d "${BACKDIR}/log" ] || [ ! -d "${BACKDIR}/conf" ]
+then
+	echo "ERROR: There is not directories. (dump, log, conf)"
+	exit 1
+fi
+
+
+#==============================================================================================================#
+### Backup config files
+cp ${ORACLE_HOME}/dbs/*${ORACLE_SID}.ora* ${BACKDIR}/conf >> "${BACKLOG}" 2>&1
+
+
+#==============================================================================================================#
+### Delete backup files
+{
+echo "[${DATE} $(date '+%H:%M:%S')] Delete backup files"
+# Delete backup file 1 days+ ago
+find ${BACKDIR:?}/dump/*.dmp -mmin +1440 -type f -delete
+# Delete log file 7 day+ ago
+find ${BACKDIR:?}/*_backup_*.log -mtime +6 -type f -delete
+find ${BACKDIR:?}/log/*.log -mtime +6 -type f -delete
+} >> "${BACKLOG}" 2>&1
+
+
+#==============================================================================================================#
+### Execute expdp
+echo "[${DATE} $(date '+%H:%M:%S')] Backup start." >> "${BACKLOG}"
+$ORACLE_HOME/bin/expdp "'/as sysdba'" dumpfile=${DIR_DUMP}:"${OUTPUT}".dmp logfile=${DIR_LOG}:"${OUTPUT}".log job_name="${OUTPUT}" full=y
+echo "[${DATE} $(date '+%H:%M:%S')] Backup end." >> "${BACKLOG}"
