@@ -2,7 +2,7 @@
 #################################################
 # Description : MySQL/MariaDB mysqldump
 # Create DATE : 2020.03.11
-# Last Update DATE : 2020.04.06 by ashurei
+# Last Update DATE : 2020.04.29 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -108,7 +108,7 @@ fi
 {
 echo "[${DATE} $(date '+%H:%M:%S')] Delete backup files"
 # Delete backup file 1 days+ ago
-find ${BACKDIR:?} -mmin +1440 -type d -print0 | xargs -0 rm -r
+find ${BACKDIR:?}/* -mmin +1440 -type d -print0 | xargs -0 rm -r
 # Delete log file 7 day+ ago
 find ${BACKDIR:?}/*_backup_*.log -mtime +6 -type f -delete
 } >> "${BACKLOG}" 2>&1
