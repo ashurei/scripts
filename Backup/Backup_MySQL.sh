@@ -108,7 +108,7 @@ fi
 {
 echo "[${DATE} $(date '+%H:%M:%S')] Delete backup files"
 # Delete backup file 1 days+ ago
-find ${BACKDIR:?}/* -type d -regextype egrep -regex ".*/[0-9]{8}" -print0 | xargs -0 rm -r
+find ${BACKDIR:?}/* -mmin +1440 -type d -regextype egrep -regex ".*/[0-9]{8}" -print0 | xargs -0 rm -r
 # Delete log file 7 day+ ago
 find ${BACKDIR:?}/*_backup_*.log -mtime +6 -type f -delete
 } >> "${BACKLOG}" 2>&1
