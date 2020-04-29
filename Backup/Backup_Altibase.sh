@@ -2,7 +2,7 @@
 #################################################
 # Description : Altibase aexport
 # Create DATE : 2020.03.12
-# Last Update DATE : 2020.03.20 by ashurei
+# Last Update DATE : 2020.04.29 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -49,7 +49,7 @@ cp "${ALTIBASE_HOME}"/conf/* "${TARGET}"/conf/ > "${LOG}" 2>&1
 {
 echo "[${DATE} $(date '+%H:%M:%S')] Delete backup files"
 # Delete backup file 1 days+ ago
-find ${BACKDIR:?} -mmin +1440 -type d -print0 | xargs -0 rm -r
+find ${BACKDIR:?}/* -mmin +1440 -type d -print0 | xargs -0 rm -r
 # Delete log file 7 day+ ago
 find ${BACKDIR:?}/*_backup_*.log -mtime +6 -type f -delete
 } >> "${BACKLOG}" 2>&1
