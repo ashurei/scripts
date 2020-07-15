@@ -2,7 +2,7 @@
 #################################################
 # Description : Altibase aexport
 # Create DATE : 2020.03.12
-# Last Update DATE : 2020.04.29 by ashurei
+# Last Update DATE : 2020.07.15 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -12,11 +12,13 @@
 SERVICE="SKB"
 SYS_ID="u1"
 SYS_PW="u1"
+PORT="20301"
 BACKDIR="/ALTIBASE/BACKUP/aexport"
 ################################
 DATE=$(date '+%Y%m%d')
 BACKLOG=${BACKDIR}/altibase_aexport_${DATE}.log
 TARGET=${BACKDIR}/${DATE}/${SYS_ID}
+LOG="${TARGET}/log/aexport_${DATE}.log"
 DIV="#############################################################################################"
 
 ### Check DB process
@@ -30,14 +32,10 @@ fi
 ### Create directory
 if [ ! -d "${TARGET}/dump" ] || [ ! -d "${TARGET}/log" ] || [ ! -d "${TARGET}/conf" ]
 then
-	{
 	mkdir -p "${TARGET}"/dump
 	mkdir -p "${TARGET}"/log
 	mkdir -p "${TARGET}"/conf
-	} >> "${BACKLOG}" 2>&1
 fi
-
-LOG="${TARGET}/log/aexport_${DATE}.log"
 
 #==============================================================================================================#
 ### Backup config files
@@ -64,7 +62,7 @@ cd "${TARGET}"/dump >> "${LOG}" 2>&1 || exit
 {
 echo $DIV
 echo "[${DATE} $(date '+%H:%M:%S')] aexport"
-"${ALTIBASE_HOME}"/bin/aexport -s localhost -u ${SYS_ID} -p ${SYS_PW}
+"${ALTIBASE_HOME}"/bin/aexport -s localhost -u ${SYS_ID} -p ${SYS_PW} -port ${PORT}
 echo $DIV
 echo "[${DATE} $(date '+%H:%M:%S')] run_il_out.sh"
 sh run_il_out.sh
