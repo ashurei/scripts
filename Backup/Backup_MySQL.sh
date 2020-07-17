@@ -2,7 +2,7 @@
 #################################################
 # Description : MySQL/MariaDB mysqldump
 # Create DATE : 2020.03.11
-# Last Update DATE : 2020.04.29 by ashurei
+# Last Update DATE : 2020.07.17 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -32,11 +32,9 @@ fi
 ### Create directory
 if [ ! -d "${TARGET}/dump" ] || [ ! -d "${TARGET}/log" ] || [ ! -d "${TARGET}/conf" ]
 then
-	{
 	mkdir -p "${TARGET}"/dump
 	mkdir -p "${TARGET}"/log
 	mkdir -p "${TARGET}"/conf
-	} >> "${BACKLOG}" 2>&1
 fi
 
 
