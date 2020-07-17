@@ -2,7 +2,7 @@
 #################################################
 # Description : Oracle expdp
 # Create DATE : 2019.12.11
-# Last Update DATE : 2020.03.20 by ashurei
+# Last Update DATE : 2020.07.17 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -27,11 +27,12 @@ then
 	exit 1
 fi
 
-### Check directorys
+### Create directorys
 if [ ! -d "${BACKDIR}/dump" ] || [ ! -d "${BACKDIR}/log" ] || [ ! -d "${BACKDIR}/conf" ]
 then
-	echo "ERROR: There is not directories. (dump, log, conf)"
-	exit 1
+	mkdir -p "${BACKDIR}/dump"
+	mkdir -p "${BACKDIR}/log"
+	mkdir -p "${BACKDIR}/conf"
 fi
 
 
