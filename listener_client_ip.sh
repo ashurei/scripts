@@ -1,6 +1,6 @@
 #!/bin/bash
 #################################################
-# Description : Altibase aexport
+# Description : Oracle Listener client ip
 # Create DATE : 2020.07.29
 # Last Update DATE : 2020.07.29 by ashurei
 # Copyright (c) Technical Solution, 2020
