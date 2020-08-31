@@ -2,7 +2,7 @@
 #################################################
 # Description : MySQL/MariaDB mysqldump
 # Create DATE : 2020.03.11
-# Last Update DATE : 2020.08.31 by ashurei
+# Last Update DATE : 2020.08.27 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -101,16 +101,6 @@ DATABASE=$(getValue "show databases")
 
 
 #==============================================================================================================#
-### Get 'log_bin' option and set '--master-data'
-LOG_BIN=$(getValue "show variables where variable_name='log_bin'")
-LOG_BIN=$(echo "${LOG_BIN}" | awk '{print $2}')
-if [ "${LOG_BIN}" = "ON" ]
-then
-        MASTER="--master-data=2"
-fi
-
-
-#==============================================================================================================#
 ### Delete backup files
 {
 echo "[${DATE} $(date '+%H:%M:%S')] Delete backup files"
@@ -131,7 +121,7 @@ do
         OUTPUT="${TARGET}/dump/${db}_${DATE}.sql"
         LOG="${TARGET}/log/${db}_${DATE}.log"
         ${MYSQLDUMP} --user=${MYSQL_ID} --password=${MYSQL_PW} --socket=${SOCKET} -v \
-                        ${MASTER} --single-transaction --events --routines --triggers "${db}" 2>"${LOG}" > "${OUTPUT}"
+                        --single-transaction --events --routines --triggers "${db}" 2>"${LOG}" > "${OUTPUT}"
 
         TIME_2=$(date '+%s')
         ELASPED_TIME=$(( TIME_2 - TIME_1 ))
