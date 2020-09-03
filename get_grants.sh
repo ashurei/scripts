@@ -1,6 +1,6 @@
 #!/bin/bash
 ##############################################################
-# Description : [MySQL] Get grants information for mysqldump recovery
+# Description : [MySQL] Get grants for mysqldump recovery
 # Create DATE : 2020.09.03
 # Last Update DATE : 2020.08.27 by ashurei
 # Copyright (c) Technical Solution, 2020
