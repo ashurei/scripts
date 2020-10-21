@@ -29,7 +29,7 @@ FILE="$1"
 if [[ -z ${FILE} || ! -f ${FILE} ]]
 then
         printf "Prepare the rpm check txt.\n"
-        printf "Usage) rpmcheck.sh <RPM LIST>"
+        printf "Usage) rpmcheck.sh <RPM LIST>\n"
         exit 1
 fi
 
