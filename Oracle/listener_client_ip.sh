@@ -2,7 +2,7 @@
 #################################################
 # Description : Oracle Listener client ip
 # Create DATE : 2020.07.29
-# Last Update DATE : 2020.07.29 by ashurei
+# Last Update DATE : 2020.10.23 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -23,7 +23,7 @@ do
   date 1> "${OUTPUT}"
   CUR_LOG=$(lsnrctl status "${lsnr}" | awk '/Listener Log File/ {print $4}')
   LOGDIR=$(dirname "${CUR_LOG}")
-  LOGFILE=$(ls "${LOGDIR}/*.xml")
+  LOGFILE=$(ls "${LOGDIR}"/*.xml)
   # Check all log*.xml
   for logfile in ${LOGFILE}
   do
