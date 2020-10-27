@@ -2,7 +2,7 @@
 ########################################################
 # Description : Check necessary rpm for Oracle
 # Create DATE : 2020.10.21
-# Last Update DATE : 2020.10.21 by ashurei
+# Last Update DATE : 2020.10.28 by ashurei
 # Copyright (c) Technical Solution, 2020
 ########################################################
 
@@ -35,7 +35,7 @@ fi
 
 ### Set variables
 RPMFILE=$(cat ${FILE})
-LINE=$(cat ${FILE} | wc -l)
+LINE=$(awk 'BEGIN {sum=0} {sum+=NF} END {printf "%d\n", sum}' ${FILE})
 
 ### Loop 'rpm -qa'
 i=0
