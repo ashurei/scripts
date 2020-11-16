@@ -10,15 +10,15 @@
 ### usage
 function usage ()
 {
-        echo "Usage: ./get_grant.sql [-u <db username> -p <password> -o <output file> [-S <socket>] ]"
+    echo "Usage: ./get_grant.sql [-u <db username> -p <password> -o <output file> [-S <socket>] ]"
 }
 
 ### Get value from Database
 function getValue()
 {
-        VALUE=$(mysql --user="${MYSQL_ID}" --password="${MYSQL_PW}" ${MYSQL_SOCK} \
-                        --skip-column-names --silent --execute="$1")
-        echo "${VALUE}"
+    VALUE=$(mysql --user="${MYSQL_ID}" --password="${MYSQL_PW}" ${MYSQL_SOCK} \
+                  --skip-column-names --silent --execute="$1")
+    echo "${VALUE}"
 }
 #==============================================================================================================#
 
