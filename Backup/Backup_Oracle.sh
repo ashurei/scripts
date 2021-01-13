@@ -2,7 +2,7 @@
 #################################################
 # Description : Oracle expdp
 # Create DATE : 2019.12.11
-# Last Update DATE : 2020.07.17 by ashurei
+# Last Update DATE : 2021.01.14 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -10,8 +10,10 @@
 ################################
 # Need to modify
 export ORACLE_SID="APCS01"
-export ORACLE_HOME="/ORACLE/product/11.2.0"
-BACKDIR="/ORACLE/BACKUP/expdp"
+export ORACLE_HOME="/oracle/database/product/19"
+BACKDIR="/oracle/backup/expdp"
+USER="system"
+PASSWD="passwd"
 ################################
 DATE=$(date '+%Y%m%d')
 BACKLOG=${BACKDIR}/oracle_expdp_${DATE}.log
@@ -30,9 +32,7 @@ fi
 ### Create directorys
 if [ ! -d "${BACKDIR}/dump" ] || [ ! -d "${BACKDIR}/log" ] || [ ! -d "${BACKDIR}/conf" ]
 then
-	mkdir -p "${BACKDIR}/dump"
-	mkdir -p "${BACKDIR}/log"
-	mkdir -p "${BACKDIR}/conf"
+	mkdir -p "${BACKDIR}/{dump,log,conf}
 fi
 
 
@@ -56,5 +56,5 @@ find ${BACKDIR:?}/log/*.log -mtime +6 -type f -delete
 #==============================================================================================================#
 ### Execute expdp
 echo "[${DATE} $(date '+%H:%M:%S')] Backup start." >> "${BACKLOG}"
-$ORACLE_HOME/bin/expdp "'/as sysdba'" dumpfile=${DIR_DUMP}:"${OUTPUT}".dmp logfile=${DIR_LOG}:"${OUTPUT}".log job_name="${OUTPUT}" full=y
+$ORACLE_HOME/bin/expdp ${USER}/${PASSWD} dumpfile=${DIR_DUMP}:"${OUTPUT}".dmp logfile=${DIR_LOG}:"${OUTPUT}".log job_name="${OUTPUT}" full=y
 echo "[${DATE} $(date '+%H:%M:%S')] Backup end." >> "${BACKLOG}"
