@@ -1,0 +1,40 @@
+1) crontab
+### Delete archive log - 2021.01.14 by ashurei
+#00 06 * * * /oracle/backup/rman/script/delete_arch.sh 1> /oracle/backup/rman/log/delete_arch.log 2>> /oracle/backup/rman/log/delete_arch_err.log
+
+
+2) delete_arch.sh
+#!/bin/bash
+set -e
+
+export ORACLE_HOME=/oracle/database/product/19
+export ORACLE_SID=UAPDB1
+export PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch:$PATH
+
+RMANDIR="/oracle/backup/rman"
+CMD="${RMANDIR}/script"
+LOG="${RMANDIR}/log"
+DATE=$(date '+%Y%m%d%H%M%S')
+
+echo "==========================================="
+echo "Remove Job Start for Archive File"
+echo "==========================================="
+
+$ORACLE_HOME/bin/rman cmdfile=${RMANDIR}/script/delete_arch.cmd log=${RMANDIR}/log/"ARCHIVE_DELETE_${ORACLE_SID}_${DATE}.log"
+
+echo
+echo "==========================================="
+echo "Remove Job log Complete"
+echo "==========================================="
+
+find ${RMANDIR}/log/*.log -ctime +30 -type f -delete
+
+
+3) delete_arch.cmd
+connect target /
+run {
+  crosscheck archivelog all;
+  delete force noprompt archivelog until time 'SYSDATE-5';
+  delete noprompt expired archivelog all;
+}
+exit
