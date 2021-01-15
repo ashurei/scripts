@@ -2,7 +2,7 @@
 #################################################
 # Description : Oracle expdp
 # Create DATE : 2019.12.11
-# Last Update DATE : 2021.01.14 by ashurei
+# Last Update DATE : 2021.01.15 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -38,7 +38,10 @@ fi
 
 #==============================================================================================================#
 ### Backup config files
-cp ${ORACLE_HOME}/dbs/*${ORACLE_SID}.ora* ${BACKDIR}/conf >> "${BACKLOG}" 2>&1
+### Backup config files
+sqlplus / as sysdba << EOF
+create pfile='${BACKDIR}/conf/init${ORACLE_SID}.ora_${DATE}' from spfile;
+EOF
 
 
 #==============================================================================================================#
@@ -49,6 +52,7 @@ echo "[${DATE} $(date '+%H:%M:%S')] Delete backup files"
 find ${BACKDIR:?}/dump/*.dmp -mmin +1440 -type f -delete
 # Delete log file 7 day+ ago
 find ${BACKDIR:?}/*_backup_*.log -mtime +6 -type f -delete
+find ${BACKDIR:?}/conf/init${ORACLE_SID}.ora* -mtime +6 -type f -delete
 find ${BACKDIR:?}/log/*.log -mtime +6 -type f -delete
 } >> "${BACKLOG}" 2>&1
 
