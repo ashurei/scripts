@@ -32,7 +32,7 @@ fi
 ### Create directorys
 if [ ! -d "${BACKDIR}/dump" ] || [ ! -d "${BACKDIR}/log" ] || [ ! -d "${BACKDIR}/conf" ]
 then
-	mkdir -p "${BACKDIR}/{dump,log,conf}
+	mkdir -p "${BACKDIR}/{dump,log,conf}"
 fi
 
 
