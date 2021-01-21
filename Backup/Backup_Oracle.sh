@@ -42,7 +42,7 @@ GRID_HOME="/oracle/grid"
 {
 echo "[${DATE} $(date '+%H:%M:%S')] Backup pfile and network config"
 cp "${GRID_HOME}"/network/admin/*.ora "${BACKDIR}"/conf/
-sqlplus -S / as sysdba <<< "create pfile='${BACKDIR}/conf/init${ORACLE_SID}.ora_${DATE}' from spfile;"
+$ORACLE_HOME/bin/sqlplus -S / as sysdba <<< "create pfile='${BACKDIR}/conf/init${ORACLE_SID}.ora_${DATE}' from spfile;"
 
 
 #==============================================================================================================#
