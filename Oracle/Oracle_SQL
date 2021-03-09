@@ -1,0 +1,1254 @@
+# 쿼리 소요 시간 측정
+set timing on
+# 현재 시간 표시
+set time on
+
+# SID와 SERIAL# 구하기 (getsid2.sql)
+select sid, serial# from v$session where sid=&sid;
+
+====== 권한 ========================================================================
+# 계정별 table 권한 확인
+set verify off line 200
+col grantee for a20
+col owner for a10
+col table_name for a30
+col grantor for a10
+col privilege for a10
+select * from dba_tab_privs where grantee=upper('&grantee');
+
+# 계정별 sys 권한 확인
+set verify off line 200
+select grantee, privilege from dba_sys_privs where grantee=upper('&grantee');
+
+# 계정별 ROLE 확인
+set line 200 pages 1000
+col grantee for a30
+col granted_role for a30
+select grantee, granted_role from dba_role_privs where grantee=upper('&grantee');
+
+# ROLE에 속한 권한 확인
+set line 200
+col role for a20
+col privilege for a30
+select * from role_sys_privs where role=upper('&role');
+==================================================================================
+
+# user / tablespace
+set line 200 pages 1000
+col username for a25
+col default_tablespace for a10
+col temporary_tablespace for a10
+select username, default_tablespace, temporary_tablespace, account_status from dba_users;
+
+
+# PROFILE 조회
+set line 200
+set pages 1000
+col profile for a20
+col resource_name for a30
+col limit for a30
+select * from dba_profiles order by 1, 2;
+
+	
+# SYNONYM 조회
+set line 200
+col pages 1000
+col synonym_name for a30
+col table_owner for a10
+col table_name for a30
+col db_link for a30
+select * from user_synonyms;
+
+
+# DBA_DATA_FILES
+set verify off lines 200
+col file_name for a60
+col tablespace_name for a20
+set pages 1000
+select file_id, file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_data_files order by file_name;
+select file_id, file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_temp_files;
+select file_id, file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_data_files
+where tablespace_name=upper('&tablespace_name');
+select file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_data_files where autoextensible='YES';
+
+
+# Table Index 확인
+set verify off lines 200
+col index_name for a30
+col column_name for a25
+col table_owner for a10
+col table_name for a20
+col index_owner for a10 
+select A.uniqueness,b.* FROM ALL_INDEXES a, ALL_IND_COLUMNS b WHERE a.index_name = b.index_name AND a.table_name=upper('&table_name');
+
+
+# DB Link
+set lines 200
+set pages 100
+col owner for a10
+col db_link for a30
+col username for a15
+col host for a20
+select * from dba_db_links;
+select * from all_db_links;
+
+
+# User Quota 정보 확인
+set lines 200
+col tablespace_name for a20
+col username for a15
+col bytes for 999999999999999
+select tablespace_name, username, bytes/1024/1024 as MEGA, MAX_BYTES, BLOCKS, MAX_BLOCKS, DROPPED from dba_ts_quotas;
+
+
+[SEGMENT]
+set line 200
+set pages 1000
+col owner for a10
+col segment_name for a30
+col segment_type for a15
+select owner, segment_name, segment_type, tablespace_name, sum(bytes)/1024/1024 as MB from dba_segments
+where owner=upper('&owner')
+--and segment_type='TABLE'
+GROUP BY owner, segment_name, segment_type, tablespace_name
+order by MB desc;
+
+
+# Tablespace Resize 확인 (db_block_size에 따라 수정 필요. 8192면 8/1024, 4096이면 4/1024)
+set verify off line 200
+set pages 1000
+col file_name for a60
+select f.file_name, round(max(e.block_id)*8/1024 + max(e.blocks*8/1024)+8/1024) "Usa", f.bytes/1024/1024 "All" from dba_extents e, dba_data_files f 
+where e.file_id in (select file_id from dba_data_files where tablespace_name=upper('&tablespace_name'))
+and e.file_id=f.file_id group by f.file_name, f.bytes/1024/1024 order by file_name;
+
+
+# 해당 USER가 사용하는 segment와 tablespace 확인
+set line 200
+set pages 10000
+col owner for a20
+col segment_name for a30
+col segment_type for a20
+col tablespace_name for a20
+select owner, segment_name, segment_type, bytes/1024/1024 MB, tablespace_name from dba_segments
+where owner=upper('&owner') order by segment_name;
+select owner, segment_name, segment_type, bytes/1024/1024 MB, tablespace_name from dba_segments
+where tablespace_name=upper('&tablespace_name')
+order by MB;
+
+
+# UNDO 실제 사용량 (undo segment의 상태가 ACTIVE, UNEXPIRED인 것의 사용률)
+column PCT_INUSE  format 999,999,999.99 heading 'UNDO Pct(%)'
+select
+   (   (
+	select (nvl(sum(bytes),0))
+	from dba_undo_extents
+	where tablespace_name='UNDOTBS1'
+	and status IN ('ACTIVE','UNEXPIRED')
+       ) * 100	) /
+   (
+	select sum(bytes)
+	from dba_data_files
+	where tablespace_name='UNDOTBS1'
+   ) "PCT_INUSE"
+from dual;
+
+
+==================================================================================
+[TEMP]
+# Temp tablespace 사용량 확인 (tempfile별)
+set line 200
+col tablespace_name for a30
+select TABLESPACE_NAME, sum(bytes)/1024/1024 MB from dba_temp_files group by TABLESPACE_NAME;
+select tablespace_name, file_id, bytes_used/1024/1024, bytes_free/1024/1024 from v$temp_space_header;
+
+# Temp tablespace 사용량 확인 ★
+set line 200
+set pages 1000
+col mb_total for 999,999,999
+col mb_used for 999,999,999
+col mb_free for 999,999,999
+col "TABLESPACE" for a20
+SELECT A.tablespace_name tablespace, D.mb_total, 
+SUM (A.used_blocks * D.block_size) / 1024 / 1024 mb_used, 
+D.mb_total - SUM (A.used_blocks * D.block_size) / 1024 / 1024 mb_free
+FROM v$sort_segment A, 
+( 
+SELECT B.name, C.block_size, SUM (C.bytes) / 1024 / 1024 mb_total 
+FROM v$tablespace B, v$tempfile C 
+WHERE B.ts#= C.ts# 
+GROUP BY B.name, C.block_size 
+) D 
+WHERE A.tablespace_name = D.name 
+GROUP by A.tablespace_name, D.mb_total; 
+
+# Temp tablespace 방식 및 사용량 확인
+set line 200
+col status for a10
+col name for a10
+col type for a10
+col "Extent Mgt" for a10
+col "Size (M)" for a15
+col "Used (M)" for a30
+SELECT d.status "Status", d.tablespace_name "Name", d.CONTENTS "Type",
+       d.extent_management "Extent Mgt",
+       TO_CHAR (NVL (a.BYTES / 1024 / 1024, 0), '99,999,990.900') "Size (M)",
+          TO_CHAR (NVL (u.BYTES, 0) / 1024 / 1024, '99999999.999')
+       || '/'
+       || TO_CHAR (NVL (a.BYTES / 1024 / 1024, 0), '99999999.999') "Used (M)",
+       TO_CHAR (NVL (t.BYTES / a.BYTES * 100, 0), '990.00') "Cached %",
+       TO_CHAR (NVL (u.BYTES / a.BYTES * 100, 0), '990.00') "Used %"
+  FROM SYS.dba_tablespaces d,
+       (SELECT   tablespace_name, SUM (BYTES) BYTES
+            FROM dba_temp_files
+        GROUP BY tablespace_name) a,
+       (SELECT   tablespace_name, SUM (bytes_cached) BYTES
+            FROM v$temp_extent_pool
+        GROUP BY tablespace_name) t ,
+        (SELECT   tablespace_name, SUM (bytes_used) BYTES
+            FROM v$temp_extent_pool
+        GROUP BY tablespace_name) u
+WHERE d.tablespace_name = a.tablespace_name(+)
+   AND d.tablespace_name = t.tablespace_name(+)
+   AND d.extent_management LIKE 'LOCAL'
+   AND d.CONTENTS LIKE 'TEMPORARY';
+
+# TEMP 모니터링 쿼리 (temp_free.sql)
+set line 200 pages 1000
+col tablespace_name for a20
+col TOTAL_SIZE for 999,999,999.99
+col "USAGE(MB)" for 999,999,999.99
+col "USAGE(%)" for 999.99
+col ALLOC_SIZE for 999,999,999.99
+col "ALLOC(%)" for 999.99
+select tablespace_name,
+tablespace_size/1024/1024 TOTAL_SIZE,
+(tablespace_size - free_space)/1024/1024 "USAGE(MB)",
+(tablespace_size - free_space) / tablespace_size * 100 "USAGE(%)",
+allocated_space/1024/1024 ALLOC_SIZE,
+allocated_space/tablespace_size*100 "ALLOC(%)"
+from DBA_TEMP_FREE_SPACE;
+
+==================================================================================
+
+# 캐릭터셋 확인
+set line 200
+set pages 100
+col name for a30
+col value$ for a50
+col comment$ for a50
+select * from sys.props$;
+
+
+# Type별 Character set 확인
+col characterset for a20
+select distinct(nls_charset_name(charsetid)) CHARACTERSET,
+       decode(type#, 1, decode(charsetform, 1, 'VARCHAR2', 2, 'NVARCHAR2','UNKNOWN'),
+                     9, decode(charsetform, 1, 'VARCHAR', 2, 'NCHAR VARYING', 'UNKNOWN'),
+                    96, decode(charsetform, 1, 'CHAR', 2, 'NCHAR', 'UNKNOWN'),
+                     8, decode(charsetform, 1, 'LONG', 'UNKNOWN'),
+                   112, decode(charsetform, 1, 'CLOB', 2, 'NCLOB', 'UNKNOWN')) TYPES_USED_IN
+from sys.col$ where charsetform in (1,2) and type# in (1, 8, 9, 96, 112)
+order by CHARACTERSET, TYPES_USED_IN;
+
+
+# NLS Parameter 조회
+set line 200
+col name for a30
+col value$ for a30
+col comment$ for a50
+set pages 100
+select * from sys.props$;
+
+
+# 아카이브 number 확인
+select name, thread# from v$archived_log where <해당 시퀀스 number> between first_change# and next_change#;
+
+
+# cursor 확인
+set line 200
+set pages 1000
+select sid, count(sid) from v$open_cursor where user_name=upper('&user_name') group by sid order by count(sid) desc;
+
+set line 200
+set pages 1000
+col sql_text for a80
+select sql_text, count(sid) cnt from v$open_cursor group by sql_text order by cnt desc;
+
+==================================================================================
+[LOCK]
+# 락걸린 테이블 확인
+set line 200
+set pages 1000
+col object_name for a30
+col owner for a10
+SELECT  do.object_name, do.owner, do.object_type, vo.xidusn, vo.session_id, vo.locked_mode
+FROM v$locked_object vo, dba_objects do
+WHERE vo.object_id = do.object_id ;
+
+# Table Lock이 걸린 세션 찾기
+select a.sid,a.serial#
+from v$session a,v$lock b, dba_objects c
+where a.sid=b.sid and b.id1=c.object_id and b.type='TM'
+and c.object_name=upper('&object_name');
+
+# Holder, Waiter 세션 조회쿼리
+set line 200
+set pages 1000
+col sess for a15
+SELECT DECODE(request,0,'Holder: ') || s.sid sess,
+s.serial# serial, l.id1, l.id2, l.lmode, l.request, l.type, to_number(round(l.ctime/60)) "LOCKTIME(M)"
+FROM V$LOCK l, V$SESSION s
+WHERE l.sid=s.sid and l.lmode>0 and l.type='TX'
+union all
+SELECT DECODE(lmode,0,'Waiter: ') || s.sid sess,
+s.serial# serial, l.id1, l.id2, l.lmode, l.request, l.type, to_number(round(l.ctime/60)) "LOCKTIME(M)"
+FROM V$LOCK l, V$SESSION s
+WHERE l.sid=s.sid and l.request>0 and l.type='TX';
+
+# SID로 쿼리 찾기 (@sid2q)
+set line 200
+set pages 1000
+col sql_text for a80
+select B.sid, A.sql_text, A.hash_value
+from v$sql A,
+(
+  select sid,sql_hash_value from v$session where sid=&sid
+) B
+where A.hash_value=B.sql_hash_value
+;
+
+==================================================================================
+[REDO]
+# redo log 조회
+set line 200 pages 1000
+col member for a50
+col status for a10
+select b.thread#, a.group#, a.member, b.bytes/1024/1024 MB, b.status, b.sequence# from gv$logfile a, gv$log b where a.group#=b.group# order by 1,2; 
+
+# Redo log switch 횟수
+REM #############################################
+REM #    Log Switch Pattern
+REM #############################################
+set linesize 250 pagesize 9999
+col "Day" for a10
+col "00" for 999
+col "01" for 999
+col "02" for 999
+col "03" for 999
+col "04" for 999
+col "05" for 999
+col "06" for 999
+col "07" for 999
+col "08" for 999
+col "09" for 999
+col "10" for 999
+col "11" for 999
+col "12" for 999
+col "13" for 999
+col "14" for 999
+col "15" for 999
+col "16" for 999
+col "17" for 999
+col "18" for 999
+col "19" for 999
+col "20" for 999
+col "21" for 999
+col "22" for 999
+col "23" for 999
+col "Per Day" for 9999
+ 
+alter session set nls_date_format = 'yyyy/mm/dd hh24:mi:ss';
+ 
+select substr(to_char(first_time,'yyyy/mm/dd'),1,10) "Day", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'00',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'00',1,0))) "00", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'01',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'01',1,0))) "01", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'02',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'02',1,0))) "02", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'03',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'03',1,0))) "03", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'04',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'04',1,0))) "04", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'05',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'05',1,0))) "05", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'06',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'06',1,0))) "06", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'07',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'07',1,0))) "07", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'08',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'08',1,0))) "08", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'09',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'09',1,0))) "09", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'10',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'10',1,0))) "10", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'11',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'11',1,0))) "11", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'12',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'12',1,0))) "12", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'13',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'13',1,0))) "13", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'14',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'14',1,0))) "14", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'15',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'15',1,0))) "15", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'16',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'16',1,0))) "16", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'17',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'17',1,0))) "17", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'18',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'18',1,0))) "18", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'19',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'19',1,0))) "19", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'20',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'20',1,0))) "20", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'21',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'21',1,0))) "21", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'22',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'22',1,0))) "22", 
+decode(sum(decode(substr(to_char(first_time,'HH24'),1,2),'23',1,0)),0,0,sum(decode(substr(to_char(first_time,'HH24'),1,2),'23',1,0))) "23", 
+decode(sum(1),0,0,sum(1)) "Per Day" 
+from v$log_history 
+where first_time >= trunc(sysdate-31) 
+group by substr(to_char(first_time,'yyyy/mm/dd'),1,10) 
+order by substr(to_char(first_time,'yyyy/mm/dd'),1,10) desc;
+ 
+ 
+
+
+# Redo log 산정(7일) (아카이브모드)
+select to_char(COMPLETION_TIME, 'YYYYMMDD') "DATE",
+ROUND(SUM(BLOCK_SIZE*BLOCKS)/1024/1024,1) "SIZE(MB)" from v$archived_log
+where COMPLETION_TIME > sysdate -7
+group by to_char(COMPLETION_TIME, 'YYYYMMDD')
+order by to_char(COMPLETION_TIME, 'YYYYMMDD');
+
+
+# 최근 한달 사이에 하루 쌓이는 Redo log 용량 MAX값 구하기
+set linesize 250
+set pagesize 9999
+col "Per Day" for 9999
+select ("Per Day" * "MB") "Redo Total Size(MB)"
+from (	select max(decode(sum(1),0,0,sum(1))) "Per Day"
+	from v$log_history 
+	where first_time >= trunc(sysdate-31) 
+	group by substr(to_char(first_time,'yyyy/mm/dd'),1,10) 
+	order by substr(to_char(first_time,'yyyy/mm/dd'),1,10) desc
+) A,
+(	select bytes/1024/1024 "MB" from v$log where rownum=1
+) B;
+==================================================================================
+
+
+# 테이블 제약조건 확인
+set line 200 pages 1000
+col table_name for a30
+col constraint_name for a30
+select table_name, constraint_name, constraint_type from dba_constraints where table_name='&table_name';
+SELECT  SUBSTR(A.COLUMN_NAME,1,15) COLUMN_NAME, DECODE(B.CONSTRAINT_TYPE, 'P','PRIMARY KEY', 'U','UNIQUE KEY', 'C','CHECK OR NOT NULL', 'R','FOREIGN KEY') CONSTRAINT_TYPE, A.CONSTRAINT_NAME CONSTRAINT_NAME FROM USER_CONS_COLUMNS A, USER_CONSTRAINTS B
+       WHERE　 A.TABLE_NAME = UPPER('&table_name') AND A.TABLE_NAME = B.TABLE_NAME　　
+            AND　 A.CONSTRAINT_NAME = B.CONSTRAINT_NAME　　
+        ORDER BY 1;
+
+
+# Datafile이 사용하고 있는 실제 용량
+set line 250
+set pages 100
+col file_name for a50
+col tablespace_name for a15
+col str for a100
+SELECT b.file_name "FILE_NAME", -- DataFile Name 
+       b.tablespace_name "TABLESPACE_NAME", -- TableSpace Name 
+       b.bytes / 1024 / 1024 "TOTAL SIZE(MB)", -- 총 Bytes 
+       ((b.bytes - sum(nvl(a.bytes,0)))) / 1024 / 1024 "USED(MB)", -- 사용한 용량 
+       (sum(nvl(a.bytes,0))) / 1024 "FREE SIZE(KB)", -- 남은 용량 
+       (sum(nvl(a.bytes,0)) / (b.bytes)) * 100 "FREE %", -- 남은 % 
+       round((b.bytes / 1024 / 1024) - ((((b.bytes - sum(nvl(a.bytes,0)))) / 1024 / 1024) + 150)) ForFree,
+       'alter database datafile '''||b.file_name||''' resize '||round((((b.bytes - sum(nvl(a.bytes,0)))) / 1024 / 1024) + 150)||'M;' str
+FROM  DBA_FREE_SPACE a, DBA_DATA_FILES b 
+WHERE a.file_id(+) = b.file_id 
+--  AND (b.tablespace_name like 'CSR%' or b.tablespace_name like 'IRIS%') -- CSR이나 IRIS만 선택 
+GROUP BY b.tablespace_name, b.file_name, b.bytes 
+ORDER BY b.tablespace_name; 
+
+
+# HWM 구하기
+set verify off
+set line 150
+column file_name format a60 word_wrapped
+break on report
+compute sum of savings on report
+undefine tablespace_name
+column value new_val blksize
+select value from v$parameter where name = 'db_block_size'
+/
+select tablespace_name, file_name,
+ceil( blocks*&&blksize/1024/1024) file_size,
+ceil( blocks*&&blksize/1024/1024) -
+ceil( (nvl(hwm,1)*&&blksize)/1024/1024 ) hwm_free_size,
+ceil( (nvl(hwm,1)*&&blksize)/1024/1024 ) hwm_used
+from dba_data_files a,
+( select file_id, max(block_id+blocks-1) hwm
+from dba_extents
+group by file_id having file_id in ( select file_id from dba_data_files
+where tablespace_name= upper('&&tablespace_name')) ) b
+where a.file_id = b.file_id(+)
+and a.tablespace_name = upper('&tablespace_name')
+order by B.file_id
+/
+
+
+# 각 영역별 메모리 사용량
+select NAME, round(BYTES/1024/1024, 2)||'MB' as MEMORY from V$SGAINFO;
+
+select * from v$resource_limit;
+
+
+# 함수 쿼리 확인
+set verify off line 200
+set pages 100
+col text for a150
+select text from dba_source where name='&NAME';
+
+
+# LOG HISTORY 확인
+select sequence#, to_char(first_time, '%^?YYYY-MM-DD:HH24:MM:SS') from v$log_history
+
+
+# 세션 정보
+set line 200
+set pages 50
+col program for a30
+col username for a15
+col osuser for a10
+col machine for a20
+
+select sid, serial#, program, username, osuser, machine, logon_time, status from v$session where status='ACTIVE';
+select sid, serial#, program, username, osuser, machine, logon_time, status from v$session where osuser='wasadm' and status='ACTIVE';
+select sid, serial#, program, username, osuser, machine, logon_time, status, service_name, action from v$session where osuser='wasadm' and status='ACTIVE';
+select username, osuser, machine, logon_time, status, process, module, schemaname from v$session where osuser='wasadm' and schemaname='PTL_USER';
+
+select sid, serial#, program, username, osuser, machine, logon_time, status from v$session where osuser='wasadm' and status='ACTIVE';
+
+# 세션 정보
+select username, osuser, logon_time, status from v$session;
+
+# 상태가 ACTIVE인 세션 개수
+select count(*) from v$session where status='ACTIVE';
+
+# 시간 형식 변경
+alter session set nls_date_format='YY-MM-DD HH:MI';
+
+# 메모리 영역별 확인
+select COMPONENT,  round(CURRENT_SIZE/1024/1024, 2)||'MB' as CUR_SIZE,   round(MIN_SIZE/1024/1024, 2)||'MB' as MIN_SIZE from V$SGA_DYNAMIC_COMPONENTS;
+
+
+==================================================================================
+# Datapump JOB 확인
+set line 200
+set pages 1000
+col owner_name for a20
+col state for a20
+select owner_name, job_name, state from dba_datapump_jobs;
+
+# Datapump JOB 삭제
+select 'drop table system.'||job_name|| ';' from dba_datapump_jobs;
+
+drop table <OWNER_NAME>.<JOB_NAME>;
+drop table SYSTEM.IMPDP_SSADBC;
+
+# Datapump 모니터링
+SELECT OPNAME, TARGET_DESC, SOFAR, TOTALWORK, (SOFAR/TOTALWORK*100) PER FROM V$SESSION_LONGOPS;
+==================================================================================
+
+
+# imp 상태 확인
+set line 200
+col table_name for a50
+select substr(sql_text,instr(sql_text,'INTO "'),30) table_name, rows_processed,
+        round((sysdate-to_date(first_load_time,'yyyy-mm-dd hh24:mi:ss'))*24*60,1) minutes,
+         trunc(rows_processed/((sysdate-to_date(first_load_time,'yyyy-mm-dd hh24:mi:ss'))*24*60)) rows_per_min
+  from sys.v_$sqlarea
+  where sql_text like 'INSERT %INTO "%'
+     and command_type = 2
+     and open_versions > 0
+/
+
+
+
+# INVALID된 OBJECT 확인
+set line 200
+set pages 1000
+col object_name for a30
+col object_type for a15
+select owner, object_name, object_type, status from dba_objects where status='INVALID';
+select object_name, object_type, status from dba_objects where owner=upper('&username') and status='INVALID';
+
+
+
+==================================================================================
+# 스냅샷 상태 확인
+alter session set nls_date_format = 'yyyy-mm-dd:hh:mi:ss';
+set line 200
+set pages 100
+col what for a80
+select job, last_date, next_date, failures, broken, what from dba_jobs;
+
+# 스냅샷 log 조회
+select * from dba_snapshot_logs;
+
+# JOB 조회
+set line 200
+col what for a70
+col interval for a30
+select job, what, last_date, next_date, interval from dba_jobs order by job;
+==================================================================================
+
+
+
+===========================================================================
+[통계정보]
+# Table 단위 통계수집(9i)
+exec dbms_stats.gather_table_stats(  -       
+ownname =>'PR', -       
+tabname => 't_user', -       
+estimate_percent => 1,  -       
+cascade => TRUE,  -       
+method_opt => 'FOR ALL COLUMNS SIZE 1' );
+
+# Table 통계정보 삭제
+exec dbms_stats.delete_table_stats(
+ownname => 'ORASKP',
+tabname => 'table_name', cascade_indexes => true);
+
+
+# Schema 단위 통계수집(9i)
+exec dbms_stats.gather_schema_stats( -      
+ownname =>'PR', -   
+estimate_percent => 1, -    
+cascade =>TRUE, -     
+method_opt =>'FOR ALL COLUMNS SIZE 1' );
+
+# 자동통계수집 off (10g)
+exec DBMS_SCHEDULER.DISABLE('GATHER_STATS_JOB');
+
+
+[Auto Task]
+# 자동 스케줄러 조회
+set line 200
+col job_name for a40
+col owner for a20
+select job_name, owner, enabled from dba_scheduler_jobs;	# 10g
+
+set line 200 pages 1000
+col client_name for a33
+col status for a10
+col mean_job_duration for a30
+col total_cpu_last_7_days for a30
+select client_name, status, mean_job_duration, total_cpu_last_7_days from dba_autotask_client;		# 11g
+
+# AUTOTASK 조회
+SET LINESIZE 150
+COL WINDOW_NAME FOR A20
+SELECT WINDOW_NAME, AUTOTASK_STATUS, OPTIMIZER_STATS, SEGMENT_ADVISOR, SQL_TUNE_ADVISOR FROM DBA_AUTOTASK_WINDOW_CLIENTS;
+
+# 요일별 스케줄러 윈도우 확인
+set line 200 pages 1000
+col window_name for a17
+col resource_plan for a25
+col schedule_owner for a3
+col schedule_name for a25
+col schedule_type for a15
+col enabled for a8
+col active for a8
+col comments for a50
+select window_name, resource_plan, schedule_owner, schedule_name, schedule_type, enabled, active, comments from dba_scheduler_windows;
+
+# DEFAULT_MAINTENANCE_PLAN 의 interval 확인
+col WINDOW_NAME for a18
+col RESOURCE_PLAN for a25
+col REPEAT_INTERVAL for a60
+col DURATION for a20
+select --a.WINDOW_GROUP_NAME, a.ENABLED, 
+c.WINDOW_NAME, c.RESOURCE_PLAN, 
+c.REPEAT_INTERVAL, c.DURATION--, c.ENABLED, c.ACTIVE
+from DBA_SCHEDULER_WINDOW_GROUPS a, 
+     DBA_SCHEDULER_WINGROUP_MEMBERS b, 
+     DBA_SCHEDULER_WINDOWS c
+where a.WINDOW_GROUP_NAME ='MAINTENANCE_WINDOW_GROUP'
+  and a.WINDOW_GROUP_NAME = b.WINDOW_GROUP_NAME
+  and b.WINDOW_NAME = c.WINDOW_NAME;
+
+# DEFAULT_MAINTENANCE_PLAN subplan 확인
+col plan for a30
+col GROUP_OR_SUBPLAN for a25
+col type for a15
+select a.plan, GROUP_OR_SUBPLAN, type, CPU_P1, CPU_P2, MAX_UTILIZATION_LIMIT
+from DBA_RSRC_PLANS a, DBA_RSRC_PLAN_DIRECTIVES b
+where a.PLAN='DEFAULT_MAINTENANCE_PLAN'
+  and a.plan = b.plan
+order by 2;
+
+# DEFAULT_MAINTENANCE_PLAN ..
+col GROUP_OR_SUBPLAN for a30
+select GROUP_OR_SUBPLAN,TYPE,CPU_P1,CPU_P2,CPU_P3 
+from DBA_RSRC_PLAN_DIRECTIVES 
+where PLAN='DEFAULT_MAINTENANCE_PLAN'
+order by type desc;
+
+# JOB class 확인
+col JOB_CLASS_NAME for a27
+col RESOURCE_CONSUMER_GROUP for a26
+col comments for a60
+select JOB_CLASS_NAME, RESOURCE_CONSUMER_GROUP, COMMENTS--, SERVICE, LOGGING_LEVEL, LOG_HISTORY
+from DBA_SCHEDULER_JOB_CLASSES;
+
+
+set line 200 pages 1000
+col owner for a15
+col job_creator for a15
+select owner, job_name, job_creator, state from DBA_SCHEDULER_JOBS;
+
+
+
+# 통계수집 off
+# Auto task off
+--exec DBMS_AUTO_TASK_ADMIN.DISABLE;
+exec DBMS_AUTO_TASK_ADMIN.DISABLE(client_name=>'sql tuning advisor', operation=>NULL, window_name=>NULL);
+exec DBMS_AUTO_TASK_ADMIN.DISABLE(client_name=>'auto optimizer stats collection', operation=>NULL, window_name=>NULL);
+exec DBMS_AUTO_TASK_ADMIN.DISABLE(client_name=>'auto space advisor', operation=>NULL, window_name=>NULL);
+exec dbms_scheduler.disable('ORACLE_OCM.MGMT_CONFIG_JOB');
+exec dbms_scheduler.disable('ORACLE_OCM.MGMT_STATS_CONFIG_JOB');
+
+
+
+
+# ORACLE_OCM JOB
+set line 200 pages 1000
+col owner for a10
+col job_name for a25
+col job_action for a40
+select owner, job_name, job_action, enabled from dba_scheduler_jobs
+where owner='ORACLE_OCM';
+
+
+# Table 최근 통계수집 날짜 조회
+set line 120
+col table_name for a30
+select table_name, num_rows, to_char(last_analyzed, 'yyyy.mm.dd') last_analyzed from dba_tables
+where table_name=upper('&table_name');
+==================================================================================
+
+
+# TPS 찾기 (Transaction Per Sec)
+set line 200
+set pages 1000
+col metric_name for a50
+select begin_time, METRIC_NAME, maxval from dba_hist_sysmetric_summary 
+where metric_name='User Transaction Per Sec' order by maxval;
+
+
+# HIDDEN Parameter 조회
+REM hidden parameter
+set pages 10000 lin 200
+col name for a50
+col cur_val for a25
+select i.ksppinm name , v.ksppstvl cur_val, v.ksppstdf default_val, v.ksppstvf
+  from x$ksppi i, x$ksppcv v
+ where i.indx = v.indx
+   and i.ksppinm like '\_%' escape '\'
+ order by i.ksppinm;
+
+
+# Opatch history 조회
+# 11g
+set line 200
+col action_time for a30
+col id for a10
+col action for a15
+col version for a10
+col comments for a50
+select substr(action_time,1,30) action_time, 
+substr(id,1,10) id, 
+substr(action,1,10) action, 
+substr(version,1,8) version, 
+substr(comments,1,20) comments 
+from registry$history; 
+
+# 12g
+set line 200
+col action for a10
+col status for a10
+col logfile for a100
+select patch_id, patch_uid, version, action, status, action_time, logfile from dba_registry_sqlpatch;
+
+
+
+# Buffer cache hit 율 조회
+select round(((1-(sum(decode(name,'physical reads', value, 0))/
+(sum(decode(name,'db block gets',value,0))+
+(sum(decode(name,'consistent gets', value,0))))))*100),2) ||
+'%'"Buffer Cache Hit Ratio"
+from v$sysstat;
+
+
+## Monitoring Oracle Data Pump import performance is simple
+set line 200
+set pages 1000
+col table_name for a50
+select substr(sql_text, instr(sql_text, 'into "'),30) table_name,
+rows_processed, round((sysdate - to_date(first_load_time, 'yyyy-mm-dd hh24:mi:ss'))*24*60,1) minumes,
+trunc(rows_processed / ((sysdate - to_date(first_load_time, 'yyyy-mm-dd hh24:mi:ss'))*24*60)) rows_per_minute
+from sys.v_$sqlarea
+where sql_text like 'insert %into "%'
+and command_type = 2
+and open_versions > 0;
+
+select sid, serial# from v$session s, dba_datapump_sessions d where s.saddr = d.saddr;
+
+select sid, serial#, sofar, totalwork from v$session_longops;
+
+
+
+# 실행 플랜
+select * from table(dbms_xplan.display_awr('&sqlid', NULL, NULL, 'ALL')) ;
+select * from table(dbms_xplan.display_cursor( '&sqlid','','ALLSTATS LAST' ) );
+
+
+# DB LINK 생성문 추출
+set line 200
+set pages 1000
+select  'create '
+|| decode (u.name, 'PUBLIC','PUBLIC')
+|| 'DATABASE_LINK '
+|| decode (u.name, 'PUBLIC',NULL,u.name || '.')
+|| l.name
+|| '" connect to "'
+|| l.userid
+|| '" identified by values "'
+|| l.passwordx
+|| '" using '''
+|| l.host
+|| ''''
+|| chr(10)
+|| ';'
+text
+from sys.link$ l, sys.user$ u
+where l.owner#=u.user#;
+
+select dbms_metadata.get_ddl('DB_LINK',db_link,owner) from dba_db_links;
+
+
+
+
+# AWR 수집 주기 확인
+col snap_interval for a20
+col retention for a20
+select snap_interval, retention from dba_hist_wr_control;
+
+# 30분마다 수집하고 30일 보관
+exec DBMS_WORKLOAD_REPOSITORY.modify_snapshot_settings(retention => 43200, interval => 30);
+
+# SCN 파라미터 조회
+set pages 10000 lin 200
+col name for a50
+col cur_val for a25
+select i.ksppinm name , v.ksppstvl cur_val, v.ksppstdf default_val, v.ksppstvf
+  from x$ksppi i, x$ksppcv v
+ where i.indx = v.indx
+   and i.ksppinm like '\_%' escape '\'
+   and i.ksppinm like '%_exter%'
+ order by i.ksppinm;
+
+
+
+
+# shrink 용량 확인
+select segment_owner, segment_name, segment_type,
+ trunc(((allocated_space)/1024)/1024) "aloc",
+ trunc(((used_space)/1024)/1024) "used" ,
+ trunc(((reclaimable_space)/1024)/1024) "reclaim"
+from table(DBMS_SPACE.ASA_RECOMMENDATIONS())
+where segment_owner='&owner'
+  and segment_type='TABLE'
+order by reclaimable_space desc;
+
+
+
+# sql history
+select  s.snap_id
+      , to_char(n.begin_interval_time,'YYYY/MM/DD HH24:MI:SS')  begint_int
+      , s.plan_hash_value
+      , s.executions_delta
+      , round(elapsed_time_delta / greatest(1, executions_delta) )  as  elapsed_time_per_exec
+      , round(cpu_time_delta     / greatest(1, executions_delta) )  as  cpu_time_per_exec
+      , elapsed_time_delta
+      , cpu_time_delta
+      , BUFFER_GETS_DELTA
+      , rows_processed_delta
+      , PLAN_HASH_VALUE
+      , VERSION_COUNT
+from
+      dba_hist_sqlstat  s
+    , dba_hist_snapshot  n
+where 1=1
+  and  s.sql_id='&sql_id'
+  and  n.snap_id = s.snap_id
+  and  n.instance_number = s.instance_number
+  and  n.dbid = s.dbid
+order by  s.snap_id, s.plan_hash_value;
+
+
+set linesize 600
+column sql_id for a15
+column event for a35
+col MACHINE for a30
+col module for a35
+col SAMPLE_TIME for a20 
+select to_char(SAMPLE_TIME,'YYYYMMDD HH24:mi') SAMPLE_TIME,MACHINE,module,event,TM_DELTA_TIME,TM_DELTA_CPU_TIME,TM_DELTA_DB_TIME, DELTA_TIME,DELTA_READ_IO_REQUESTS 
+from DBA_HIST_ACTIVE_SESS_HISTORY
+where SAMPLE_TIME between to_timestamp('20170109 08:00','YYYYMMDD HH24:MI') and to_timestamp('20170111 15:00','YYYYMMDD HH24:MI')
+and sql_id='&sql_id'
+order by 1 asc ;
+
+set linesize 600
+column sql_id for a15
+column event for a35
+col MACHINE for a30
+col module for a35
+col to_char(SAMPLE_TIME,'YYYYMMDD HH24:mi') for a20
+col SAMPLE_TIME for a20
+prompt Input time using this format [YYYYMMDD HH24]
+select to_char(SAMPLE_TIME,'YYYYMMDD HH24:mi') SAMPLE_TIME,sql_id,MACHINE,module,event,TM_DELTA_TIME,TM_DELTA_CPU_TIME,TM_DELTA_DB_TIME, DELTA_TIME,DELTA_READ_IO_REQUESTS
+from DBA_HIST_ACTIVE_SESS_HISTORY
+where SAMPLE_TIME between to_timestamp('20170109 08:00','YYYYMMDD HH24:MI') and to_timestamp('20170111 15:00','YYYYMMDD HH24:MI')
+and event like 'SQL*Net break/reset to%'
+--sql_id='5banwfbnk5yfa'
+order by 1 asc ;
+
+
+
+ 
+# SYSAUX =============================================================
+# WRH$_ACTIVE_SESSION_HISTORY shrink
+exec dbms_workload_repository.modify_snapshot_settings(interval => 0);
+
+exec dbms_workload_repository.drop_snapshot_range(1,3794,354024127);
+
+alter table WRH$_ACTIVE_SESSION_HISTORY enable row movement;
+alter table WRH$_ACTIVE_SESSION_HISTORY shrink space;
+alter table WRH$_ACTIVE_SESSION_HISTORY disable row movement;
+
+exec dbms_workload_repository.modify_snapshot_settings(interval => 30);
+
+# segment size
+set line 200
+col owner for a10
+col segment_name for a50
+col partition_name for a50
+select owner, segment_name, segment_type, partition_name, segment_type, bytes/1024/1024/1024 Size_GB
+from dba_segments
+where segment_name='WRH$_ACTIVE_SESSION_HISTORY';
+
+# SYSAUX segment
+set line 200
+set pages 10000
+col owner for a20
+col segment_name for a40
+col segment_type for a20
+col tablespace_name for a15
+select owner, segment_name, segment_type, bytes/1024/1024 MB, tablespace_name from dba_segments
+where tablespace_name='SYSAUX'
+order by MB;
+# ===================================================================
+
+# 성능 모니터링 쿼리
+==============================================================================
+select * from v$buffer_pool;
+select * from v$pgastat;
+select * from v$filestat;
+select * from v$tempstat;
+
+# CPU 사용량 순
+set line 200
+set pages 1000
+col username for a10
+col module for a40
+col event for a50
+select s.sid, s.serial#, p.spid as "os pid", s.username, s.module, s.sql_id, event, seconds_in_wait,
+st.value/100 as "cpu sec"
+--round(sum(pga_used_mem)/1024/1024) "pga_tot(mb)"
+--round(sum(pga_used_mem)/1024/1024) "pga_per_sess(mb)"
+from v$sesstat st, v$statname sn, v$session s, v$process p
+where sn.name='CPU used by this session'
+and st.statistic# = sn.statistic#
+and st.sid=s.sid
+and s.paddr=p.addr
+and s.last_call_et < 1800
+and s.logon_time > (SYSDATE - 240/1440)
+AND S.USERNAME='DEVSALE1'
+order by st.value;
+
+
+# PGA 사용 현황
+set line 200
+set pages 1000
+col machine for a30
+select machine, status, count(*) cnt,
+round(sum(pga_used_mem)/1024/1024) "pga_tot(mb)",
+round(sum(pga_used_mem)/count(*)/1024/1024) "pga_per_sess(mb)"
+from v$session s, v$process p
+where 1=1
+--and s.status='active'
+and s.paddr=p.addr
+and type <> 'BACKGROUND'
+group by machine, status
+order by 1;
+
+
+# current pga/uga
+
+ttitle '1. Current pga, uga session memory'
+
+set line 200
+set pages 1000
+col username for a15
+col pgm for a30
+col pga fot a10
+select a.sid, a.username, substr(a.program, 1, 25) as pgm, a.terminal,
+max(decode(c.name, 'session pga memory', trunc(value/1000)||'K', 0)) pga,
+max(decode(c.name, 'session uga memory', trunc(value/1000)||'K', 0)) uga
+from v$session a, v$sesstat b, v$statname c
+where a.sid = b.sid
+and b.statistic# = c.statistic#
+and c.name like 'session%'
+group by a.sid, a.username, substr(a.program, 1, 25), a.terminal;
+
+
+ttitle '2. Sum of current pga, uga session memory'
+
+select 'Current PGA, UGA session memory SUM:' as sum,
+sum(decode(c.name, 'session pga memory', trunc(value/1000),0))||'K' pga_sum,
+sum(decode(c.name, 'session uga memory', trunc(value/1000),0))||'K' uga_sum
+from v$session a, v$sesstat b, v$statname c
+where a.sid = b.sid
+and b.statistic# = c.statistic#
+and c.name like 'session%';
+
+ttitle '3. Max(peak) pga, pga session memory'
+
+select a.sid, a.username, substr(a.program, 1, 25) as pgm, a.terminal,
+max(decode(c.name, 'session pga memory max', trunc(value/1000)||'K', 0)) pga_max,
+max(decode(c.name, 'session uga memory max', trunc(value/1000)||'K', 0)) uga_max
+from v$session a, v$sesstat b, v$statname c
+where a.sid = b.sid
+and b.statistic# = c.statistic#
+and c.name like 'session%'
+group by a.sid, a.username, substr(a.program, 1, 25), a.terminal;
+
+ttitle '4. Sum of max(peak) pga, uga session memory'
+
+select 'Max(peak) PGA, UGA session memory SUM:' as sum,
+sum(decode(c.name, 'session pga memory max', trunc(value/1000), 0))||'K' pga_m_sum,
+sum(decode(c.name, 'session uga memory max', trunc(value/1000), 0))||'K' uga_m_sum
+from v$session a, v$sesstat b, v$statname c
+where a.sid = b.sid
+and b.statistic# = c.statistic#
+and c.name like 'session%';
+
+
+
+
+set line 200
+set pages 1000
+col oracle_username for a15
+col os_username for a15
+col session_program for a35
+col session_machine for a15
+SELECT
+s.sid sid,
+lpad(s.username,12) oracle_username,
+lpad(s.osuser,9) os_username,
+s.program session_program,
+--lpad(s.machine,8) session_machine,
+s.machine session_machine,
+(select ss.value from v$sesstat ss, v$statname sn
+where ss.sid = s.sid and
+sn.statistic# = ss.statistic# and
+sn.name = 'session pga memory') session_pga_memory
+, (select ss.value from v$sesstat ss, v$statname sn
+where ss.sid = s.sid and
+sn.statistic# = ss.statistic# and
+sn.name = 'session pga memory max') session_pga_memory_max
+, (select ss.value from v$sesstat ss, v$statname sn
+where ss.sid = s.sid and
+sn.statistic# = ss.statistic# and
+sn.name = 'session uga memory') session_uga_memory
+, (select ss.value from v$sesstat ss, v$statname sn
+where ss.sid = s.sid and
+sn.statistic# = ss.statistic# and
+sn.name = 'session uga memory max') session_uga_memory_max
+FROM
+v$session s
+ORDER BY session_pga_memory DESC;
+
+
+
+select (a.pga_memory),(a.pga_memory)/1000/1000||'M', a.session_id, b.sql_id, b.prev_sql_id
+from v$sessmetric a, v$session b, v$process c
+where a.session_id = b.sid
+and b.paddr = c.addr
+--and b.machine ='ktmcstm2'
+order by a.pga_memory desc;
+
+
+
+# IMP 속도 모니터링 쿼리
+select 
+  substr(sql_text,instr(sql_text,'INTO "'),30) “테이블명”, 
+  rows_processed, 
+  round((sysdate- 
+    to_date(first_load_time,'yyyy-mm-dd hh24:mi:ss'))*24*60,1) “분”, 
+  trunc(rows_processed/ 
+    ((sysdate-to_date(first_load_time,'yyyy-mm-dd hh24:mi:ss'))*24*60)) “분당 입력 데이터 건수” 
+from  sys.v_$sqlarea 
+where sql_text like 'INSERT %INTO "%' 
+and  command_type = 2 
+and  open_versions > 0; 
+
+
+
+# Shared pool 모니터링
+아래의 쿼리로 SQCI shared pool 모니터링 하세요..
+REM  Investigate trends in the SGA
+REM   It is safe to run this query as often as you like.
+REM   
+REM   You can change "and bytes > 10000000" higher
+REM    or lower to fit your needs.  10.2.x redesigned
+REM    the v$sgastat view and it will contain hundreds
+REM    of rows and it is usually not necessary to see
+REM    them all.
+
+set lines 100
+set pages 9999
+col mb format 999,999
+col name heading "Name"
+spool allocations.out
+select to_char(sysdate, 'dd-MON-yyyy hh24:mi:ss') "Script Run TimeStamp" from dual;
+select to_char(startup_time, 'dd-MON-yyyy hh24:mi:ss') "Startup Time" from v$instance;
+select name, round((bytes/1024/1024),0) MB from v$sgastat where pool='shared pool' and bytes > 10000000 order by bytes desc;
+==============================================================================
+
+
+1. TABLE SPACE 
+
+select  convert(dec(15,2),(total_size - (case when db_size >= reservedpages then
+(db_size - reservedpages) else 0 end))) * 100 / convert(dec(15,2),total_size) 'USED USAGE'   
+from 
+(
+  select sum(convert(bigint,case when status & 64 = 0 then size else 0 end)) db_size
+   ,  sum(convert(bigint,case when status & 64 <> 0 then size else 0 end)) log_size   
+   ,  SUM(convert(bigint, size)) total_size
+   ,  (select sum(a.total_pages) from sys.partitions p join sys.allocation_units a on p.partition_id = a.container_id
+       left join sys.internal_tables it on p.object_id = it.object_id) reservedpages
+  from dbo.sysfiles
+) tab
+ 
+
+
+2. DEADLOCK수
+
+ SELECT @@servicename + '_' + ltrim(rtrim(instance_name)) + '.' + 'SQLLocks', cntr_value 
+      FROM master.sys.dm_os_performance_counters 
+     WHERE object_name like '%:Locks%' and counter_name = 'Number of Deadlocks/sec'
+	 
+
+
+
+
+==============================================================================
+# total_free.sql
+set line 120
+set pagesize 100
+column tn   format a20            heading 'TableSpace|Name'
+column Tot  format 999,999,999.99 heading 'Total|(Mb)'
+column Free format 999,999,999.99 heading 'Free|(Mb)'
+column Used format 999,999,999.99 heading 'Used|(Mb)'
+column Pct  format 999,999,999.99 heading 'Pct|(%)'
+SELECT  t.tn,
+        t.sizes Tot,
+        (t.sizes - f.sizes ) Used,
+        (t.sizes - f.sizes) /t.sizes * 100 Pct,
+        f.sizes Free
+FROM    ( SELECT tablespace_name tn,
+                 sum(bytes)/1024/1024 Sizes
+          FROM   dba_data_files
+          GROUP  BY tablespace_name) t,
+        ( SELECT tablespace_name tn,
+                 sum(bytes)/1024/1024 sizes
+          FROM   dba_free_space
+          GROUP BY tablespace_name) f
+WHERE t.tn = f.tn
+ORDER BY Pct desc
+/
+
+
+# temp_free.sql
+set line 200 pages 1000
+col tablespace_name for a20
+col total_m for	999,999,999.99 heading 'TOTAL (MB)'
+col free_m for	999,999,999.99 heading 'FREE (MB)'
+col pct_used for	999,999,999.99 heading 'PCT|(%)'
+select a.tablespace_name, a.total_M, b.free_M, round((b.used_M/a.total_M)*100,2) pct_used
+from ( select tablespace_name, sum(bytes/1024/1024) total_M from dba_temp_files
+ group by tablespace_name ) a,
+ ( select tablespace_name, sum(bytes_free/1024/1024) free_M, sum(bytes_used/1024/1024) used_M
+   from v$temp_space_header
+   group by tablespace_name ) b
+where a.tablespace_name = b.tablespace_name
+/
+
+
+# component 조회
+set line 200
+col comp_name for a40
+col version for a10
+col status for a10
+select comp_name, version, status from dba_registry;
+
+
+# all_directories
+set line 200 pages 1000
+col directory_name for a30
+col directory_path for a60
+select * from all_directories;
+
+
+# pga 사용량 확인 (https://otsteam.tistory.com/94)
+set line 200 pages 1000
+col name for a30
+select m.name, t.value
+from v$sesstat t, v$statname m
+where t.statistic# = m.statistic#
+  and m.name like '%pga%'
+  and t.sid = (select distinct sid from v$mystat);
+
+
+# SCN headroom 조회
+set numwidth 14
+select 
+  maximum_scn, current_scn,
+    trunc((maximum_scn - current_scn)/(16384*3600*24),1)||' Days' headroom
+  from (
+    select dbms_flashback.get_system_change_number current_scn,
+    ((((to_number(to_char(sysdate, 'YYYY'))-1988)*372)+
+      ((to_number(to_char(sysdate,'MM'))-1)*31)+
+      ((to_number(to_char(sysdate,'DD'))-1)))*86400+
+      (to_number(to_char(sysdate,'HH24'))*3600)+
+      (to_number(to_char(sysdate,'MI'))*60)+
+      to_number(to_char(sysdate,'SS')))*16384 maximum_scn from dual) scn_stat;
+
+
+# 트랜잭션 수 파악 per minute
+SELECT SUM(s.value/(86400*(SYSDATE - startup_time))) "tps"
+FROM V$SYSSTAT s, V$INSTANCE i
+WHERE s.NAME in ('user commits','transaction rollbacks');
+
+
+# pid 로 sql 확인
+set line 200 pages 1000
+col sql_text for a70
+col sid for 99999
+col machine for a13
+col osuser for a10
+select c.sql_text, b.SID, b.SERIAL#, b.machine, b.OSUSER, to_char(b.logon_time,'YYYY-MM-DD HH24:MI:SS') logon_time
+from v$process a, v$session b, v$sqltext c
+where a.addr = b.paddr
+  and b.sql_hash_value = c.hash_value
+  and a.spid = &spid
+order by c.PIECE;
+
+
+# all_directories;
+set line 200 pages 1000
+col directory_name for a30
+col directory_path for a50
+select directory_name, directory_path from all_directories;
