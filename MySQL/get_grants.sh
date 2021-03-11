@@ -2,7 +2,7 @@
 ##############################################################
 # Description : [MySQL] Get grants for mysqldump recovery
 # Create DATE : 2020.08.27
-# Last Update DATE : 2020.11.16 by ashurei
+# Last Update DATE : 2021.03.11 by ashurei
 # Copyright (c) Technical Solution, 2020
 ##############################################################
 
