@@ -50,7 +50,7 @@ do
 done
 
 ### Create socket option
-if [ -n ${SOCKET} ]
+if [ -n "${SOCKET}" ]
 then
     MYSQL_SOCK="--socket=${SOCKET}"
 fi
