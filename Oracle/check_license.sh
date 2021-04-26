@@ -21,7 +21,7 @@ function Check_OS() {
   OS_ARCH=$(uname -i)
   OS=$(cat /etc/redhat-release)
 
-  if [ ! "$(which dmidecode)" ]
+  if [ ! -f "/usr/sbin/dmidecode" ]
   then
     echo "'dmidecode' is not exists." >> "${LOG}"
     echo "Please install 'dmidecode'." >> "${LOG}"
@@ -29,22 +29,24 @@ function Check_OS() {
   fi
 
   # Check Virtual Machine
-  VM_TYPE=$(lscpu | grep Hypervisor | awk '{print $3}')
-  if [ -z "${VM_TYPE}" ]
-  then
-    MACHINE_TYPE=BM
-  else
-    MACHINE_TYPE=${VM_TYPE}
-  fi
+  #VM_TYPE=$(lscpu | grep Hypervisor | awk '{print $3}')
+  #if [ -z "${VM_TYPE}" ]
+  #then
+  #  MACHINE_TYPE=BM
+  #else
+  #  MACHINE_TYPE=${VM_TYPE}
+  #fi
+
+  MACHINE_TYPE=$(sudo dmidecode -s system-product-name | grep -v ^#)
 
   MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{print $2/1024/1024}')
-  HW_VENDOR=$(sudo dmidecode -s system-product-name | tail -1)
-  PROCESSOR_MANUFACTURER=$(sudo dmidecode -s processor-manufacturer | tail -1)
-  PROCESSOR_FAMILY=$(sudo dmidecode -s processor-family | tail -1)
-  PROCESSOR_VERSION=$(sudo dmidecode -s processor-version | sed "s/^ //g" | head -1)
+  HW_VENDOR=$(sudo dmidecode -s system-product-name | grep -v ^# | tail -1)
+  PROCESSOR_MANUFACTURER=$(sudo dmidecode -s processor-manufacturer | grep -v ^# | tail -1)
+  PROCESSOR_FAMILY=$(sudo dmidecode -s processor-family | grep -v ^# | tail -1)
+  PROCESSOR_VERSION=$(sudo dmidecode -s processor-version | grep -v ^# | sed "s/^ //g" | head -1)
   CPU_COUNT_OS=$(grep -c ^processor /proc/cpuinfo)
   CPU_CORE_COUNT_OS=$(grep 'cpu cores' /proc/cpuinfo | tail -1 | awk '{print $4}')
-  CPU_SOCKET_COUNT_OS=$(sudo dmidecode -t processor | grep -c 'Socket Designation')
+  CPU_SOCKET_COUNT_OS=$(sudo dmidecode -t processor | grep -v ^# | grep -c 'Socket Designation')
 
   if ! sudo dmidecode -t processor | grep -q HTT
   then
@@ -78,7 +80,7 @@ function Get_oracle_env() {
   ORACLE_SID=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $11}' | cut -d"_" -f3)
   if [ -n "${ORACLE_USER}" ]
   then
-    ORACLE_HOME=$(su - "${ORACLE_USER}" -c "env" | grep ^ORACLE_HOME | cut -d"=" -f2)
+    ORACLE_HOME=$(sudo su - "${ORACLE_USER}" -c "env" | grep ^ORACLE_HOME | cut -d"=" -f2)
   else
     echo "Oracle Database is not exists on this server." >> "${LOG}"
     exit 1
@@ -87,7 +89,7 @@ function Get_oracle_env() {
 
 ### Get Oracle result with sqlplus
 function Cmd_sqlplus() {
-  sudo su - "$1" -c "sqlplus -silent / as sysdba" << EOF
+  sudo su - "$1" -c "sqlplus -silent / as sysdba" 2>/dev/null << EOF
 set pagesize 0 feedback off verify off heading off echo off timing off line 500
 spool ${SPOOL}
 $2
@@ -229,4 +231,4 @@ Check_option
 
 Create_output
 
-rm ${SPOOL}
+sudo rm ${SPOOL}
