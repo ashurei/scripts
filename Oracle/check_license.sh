@@ -12,7 +12,8 @@ BIN_DIR="/tmp/oracle_check"
 SPOOL="/tmp/result.log"
 OUTPUT="${BIN_DIR}/$(hostname)_license_${DATE}.out"
 LOG="${BIN_DIR}/$(hostname)_license_${DATE}.log"
-
+GENERAL_RAW="db_general_check.rawdata"
+OPTION_RAW="db_check.rawdata"
 
 # ========== Functions ========== #
 ### OS Check
@@ -89,12 +90,24 @@ function Get_oracle_env() {
 
 ### Get Oracle result with sqlplus
 function Cmd_sqlplus() {
+  GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
+  IS_GLOGIN=$(cat ${GLOGIN} | sed '/^$/d' | grep -cv "\-\-")
+  if [ "${IS_GLOGIN}" -gt 0 ]
+  then
+    sudo mv "${GLOGIN}" "${GLOGIN}"_old
+  fi
+
   sudo su - "$1" -c "sqlplus -silent / as sysdba" 2>/dev/null << EOF
 set pagesize 0 feedback off verify off heading off echo off timing off line 500
 spool ${SPOOL}
 $2
 exit
 EOF
+
+  if [ "${IS_GLOGIN}" -gt 0 ]
+  then
+    sudo mv "${GLOGIN}"_old "${GLOGIN}"
+  fi
 }
 
 ### Check Oracle version
@@ -117,11 +130,11 @@ function Check_version() {
 function Check_general () {
   if [ "${ORACLE_MAJOR_VERSION}" == 11 ]
   then
-    Cmd_sqlplus "${ORACLE_USER}" "@${BIN_DIR}/oracle_general_11.sql" > db_general_check.rawdata
+    Cmd_sqlplus "${ORACLE_USER}" "@${BIN_DIR}/oracle_general_11.sql" > "${GENERAL_RAW}"
     Print_Oracle_general_result
   elif [ "${ORACLE_MAJOR_VERSION}" -ge 12 ]
   then
-    Cmd_sqlplus "${ORACLE_USER}" "@${BIN_DIR}/oracle_general_12.sql" > db_general_check.rawdata
+    Cmd_sqlplus "${ORACLE_USER}" "@${BIN_DIR}/oracle_general_12.sql" > "${GENERAL_RAW}"
     Set_option_var
     Print_Oracle_general_result
  fi
@@ -177,12 +190,12 @@ function Check_option_var() {
 function Check_option () {
   if [ "${ORACLE_MAJOR_VERSION}" == 11 ]
   then
-    Cmd_sqlplus "${ORACLE_USER}" "@${BIN_DIR}/oracle_check_11.sql" > db_check.rawdata
+    Cmd_sqlplus "${ORACLE_USER}" "@${BIN_DIR}/oracle_check_11.sql" > "${OPTION_RAW}"
     Set_option_var
     Print_Oracle_check_result
   elif [ "${ORACLE_MAJOR_VERSION}" -ge 12 ]
   then
-    Cmd_sqlplus "${ORACLE_USER}" "@${BIN_DIR}/oracle_check_12.sql" > db_check.rawdata
+    Cmd_sqlplus "${ORACLE_USER}" "@${BIN_DIR}/oracle_check_12.sql" > "${OPTION_RAW}"
     Set_option_var
     Print_Oracle_check_result
   else
@@ -209,13 +222,6 @@ function Print_Oracle_check_result() {
 function Create_output () {
   printf "%s%s%s\n" "${OS_CHECK_HEADER}" "${DB_CHECK_HEADER}" "${DB_GENERAL_HEADER}" >  "${OUTPUT}"
   printf "%s%s%s"   "${OS_CHECK_RESULT}" "${DB_CHECK_RESULT}" "${DB_GENERAL_RESULT}" >> "${OUTPUT}"
-
-  #printf "${OS_CHECK_HEADER}"           > "${OUTPUT}"
-  #printf "${DB_CHECK_HEADER}"           >> "${OUTPUT}"
-  #printf "${DB_GENERAL_HEADER}\n"       >> "${OUTPUT}"
-  #printf "${OS_CHECK_RESULT}"           >> "${OUTPUT}"
-  #printf "${DB_CHECK_RESULT}"           >> "${OUTPUT}"
-  #printf "${DB_GENERAL_RESULT}"         >> "${OUTPUT}"
 }
 
 
