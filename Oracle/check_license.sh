@@ -21,36 +21,36 @@ function Check_OS() {
   OS_ARCH=$(uname -i)
   OS=$(cat /etc/redhat-release)
 
-  if [ ! $(which dmidecode) ]
+  if [ ! "$(which dmidecode)" ]
   then
-    echo "'dmidecode' is not exists." >> ${LOG}
-    echo "Please install 'dmidecode'." >> ${LOG}
+    echo "'dmidecode' is not exists." >> "${LOG}"
+    echo "Please install 'dmidecode'." >> "${LOG}"
     exit 1
   fi
 
   # Check Virtual Machine
   VM_TYPE=$(lscpu | grep Hypervisor | awk '{print $3}')
-  if [ -z ${VM_TYPE} ]
+  if [ -z "${VM_TYPE}" ]
   then
     MACHINE_TYPE=BM
   else
     MACHINE_TYPE=${VM_TYPE}
   fi
 
-  MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk {'print $2/1024/1024'})
+  MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{print $2/1024/1024}')
   HW_VENDOR=$(sudo dmidecode -s system-product-name | tail -1)
   PROCESSOR_MANUFACTURER=$(sudo dmidecode -s processor-manufacturer | tail -1)
   PROCESSOR_FAMILY=$(sudo dmidecode -s processor-family | tail -1)
   PROCESSOR_VERSION=$(sudo dmidecode -s processor-version | sed "s/^ //g" | head -1)
-  CPU_COUNT_OS=$(grep ^processor /proc/cpuinfo | wc -l)
-  CPU_CORE_COUNT_OS=$(grep 'cpu cores' /proc/cpuinfo | tail -1 | awk {'print $4'})
-  CPU_SOCKET_COUNT_OS=$(sudo dmidecode -t processor | grep 'Socket Designation' | wc -l)
+  CPU_COUNT_OS=$(grep -c ^processor /proc/cpuinfo)
+  CPU_CORE_COUNT_OS=$(grep 'cpu cores' /proc/cpuinfo | tail -1 | awk '{print $4}')
+  CPU_SOCKET_COUNT_OS=$(sudo dmidecode -t processor | grep -c 'Socket Designation')
 
-  if [[ -z $(sudo dmidecode -t processor | grep HTT) ]] ;
+  if ! sudo dmidecode -t processor | grep -q HTT
   then
     HYPERTHREDING=0
   else
-    HYPERTHREDING=$(sudo dmidecode -t processor | grep HTT | tail -1 | awk {'print $1'})
+    HYPERTHREDING=$(sudo dmidecode -t processor | grep HTT | tail -1 | awk '{print $1}')
   fi
 
   #echo "HOSTNAME : "$HOSTNAME
@@ -69,18 +69,18 @@ function Check_OS() {
   #echo
 
   OS_CHECK_HEADER="HOSTNAME|OS|OS_ARCH|MEMORY_SIZE(GB)|MACHINE_TYPE|HW_VENDOR|PROCESSOR_MANUFACTURER|PROCESSOR_FAMILY|PROCESSOR_VERSION|CPU_COUNT_OS|CPU_CORE_COUNT_OS|CPU_SOCKET_COUNT_OS|HYPERTHREDING|"
-  OS_CHECK_RESULT=$(printf "$HOSTNAME|$OS|$OS_ARCH|$MEMORY_SIZE|$MACHINE_TYPE|$HW_VENDOR|$PROCESSOR_MANUFACTURER|$PROCESSOR_FAMILY|$PROCESSOR_VERSION|$CPU_COUNT_OS|$CPU_CORE_COUNT_OS|$CPU_SOCKET_COUNT_OS|$HYPERTHREDING|")
+  OS_CHECK_RESULT="$HOSTNAME|$OS|$OS_ARCH|$MEMORY_SIZE|$MACHINE_TYPE|$HW_VENDOR|$PROCESSOR_MANUFACTURER|$PROCESSOR_FAMILY|$PROCESSOR_VERSION|$CPU_COUNT_OS|$CPU_CORE_COUNT_OS|$CPU_SOCKET_COUNT_OS|$HYPERTHREDING|"
 }
 
 # Get Oracle environment variable
 function Get_oracle_env() {
   ORACLE_USER=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $1}')
   ORACLE_SID=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $11}' | cut -d"_" -f3)
-  if [ -n ${ORACLE_USER} ]
+  if [ -n "${ORACLE_USER}" ]
   then
-    ORACLE_HOME=$(su - ${ORACLE_USER} -c "env" | grep ^ORACLE_HOME | cut -d"=" -f2)
+    ORACLE_HOME=$(su - "${ORACLE_USER}" -c "env" | grep ^ORACLE_HOME | cut -d"=" -f2)
   else
-    echo "Oracle Database is not exists on this server." >> ${LOG}
+    echo "Oracle Database is not exists on this server." >> "${LOG}"
     exit 1
   fi
 }
@@ -98,15 +98,15 @@ EOF
 ### Check Oracle version
 function Check_version() {
   ORACLE_VERSION=$(Cmd_sqlplus "${ORACLE_USER}" "select version from v\$instance;")
-  ORACLE_MAJOR_VERSION=$(echo ${ORACLE_VERSION} | cut -d"." -f1)
+  ORACLE_MAJOR_VERSION=$(echo "${ORACLE_VERSION}" | cut -d"." -f1)
 
   number='[0-9]'
   if ! [[ "${ORACLE_MAJOR_VERSION}" =~ $number ]]
   then
-    echo "Error: can't check oracle version. Check oracle environment" >> ${LOG}
-    echo "## Oracle USER : ${ORACLE_USER}" >> ${LOG}
-    echo "## Oracle HOME : ${ORACLE_HOME}" >> ${LOG}
-    echo "## Oracle SID : ${ORACLE_SID}" >> ${LOG}
+    echo "Error: can't check oracle version. Check oracle environment" >> "${LOG}"
+    echo "## Oracle USER : ${ORACLE_USER}" >> "${LOG}"
+    echo "## Oracle HOME : ${ORACLE_HOME}" >> "${LOG}"
+    echo "## Oracle SID : ${ORACLE_SID}" >> "${LOG}"
     exit
   fi
 }
@@ -129,7 +129,7 @@ function Print_Oracle_general_result() {
   #echo "DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH\n"
   #cat ${SPOOL} # | awk -F\| '{print $1,$2,$3,$4,$5,$6,$7,$8}'
   DB_GENERAL_HEADER="DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH"
-  DB_GENERAL_RESULT=$(cat ${SPOOL} | sed "s/  //g" )
+  DB_GENERAL_RESULT=$(sed "s/  //g" ${SPOOL})
 }
 
 function Set_option_var() {
@@ -159,13 +159,14 @@ function Set_option_var() {
 }
 
 function Check_option_var() {
-  if [[ -z $(cat ${SPOOL} | grep "${2}" | grep -v "NO_USAGE" ) ]]
+  #if [[ -z $(grep "${2}" ${SPOOL} | grep -v "NO_USAGE" ) ]]
+  if grep -q "${2}" ${SPOOL} | grep -v "NO_USAGE"
   then
-    eval $3=0   # NO_USAGE ==> 0
+    eval "$3"=0   # NO_USAGE ==> 0
   else
-    option=$(cat ${SPOOL} | grep "${2}" | cut -d"|" -f6 | grep -v "NO_USAGE"| wc -l)
+    option=$(grep "${2}" ${SPOOL} | cut -d"|" -f6 | grep -cv "NO_USAGE")
     #eval $3="${#option[@]}"     # Count of options
-    eval $3=${option}
+    eval "$3"="${option}"
   fi
 }
 
@@ -183,7 +184,7 @@ function Check_option () {
     Set_option_var
     Print_Oracle_check_result
   else
-    echo "This script is for 11g over." >> ${LOG}
+    echo "This script is for 11g over." >> "${LOG}"
     exit
   fi
 }
@@ -200,21 +201,24 @@ function Print_Oracle_check_result() {
 #printf "\033[0m"
 
   DB_CHECK_HEADER=$(printf ".Database Gateway|.Exadata|.GoldenGate|.HW|.Pillar Storage|Active Data Guard|Active Data Guard or Real Application Clusters|Advanced Analytics|Advanced Compression|Advanced Security|Database In-Memory|Database Vault|Diagnostics Pack|Label Security|Multitenant|OLAP|Partitioning|RAC or RAC One Node|Real Application Clusters|Real Application Clusters One Node|Real Application Testing|Spatial and Graph|Tuning Pack|")
-  DB_CHECK_RESULT=$(printf "${DATABASE_GATEWAY}|${EXADATA}|${GOLDENGATE}|${HW}|${PILLARSTORAGE}|${ADG}|${ADG_RAC}|${AA}|${AC}|${AS}|${DIM}|${DV}|${DP}|${LS}|${MT}|${OLAP}|${PARTITION}|${RAC_ONENODE}|${RAC}|${ONENODE}|${RAT}|${SPATIAL}|${TUNING}|")
+  DB_CHECK_RESULT="${DATABASE_GATEWAY}|${EXADATA}|${GOLDENGATE}|${HW}|${PILLARSTORAGE}|${ADG}|${ADG_RAC}|${AA}|${AC}|${AS}|${DIM}|${DV}|${DP}|${LS}|${MT}|${OLAP}|${PARTITION}|${RAC_ONENODE}|${RAC}|${ONENODE}|${RAT}|${SPATIAL}|${TUNING}|"
 }
 
 function Create_output () {
-  printf "${OS_CHECK_HEADER}"           > ${OUTPUT}
-  printf "${DB_CHECK_HEADER}"           >> ${OUTPUT}
-  printf "${DB_GENERAL_HEADER}\n"       >> ${OUTPUT}
-  printf "${OS_CHECK_RESULT}"           >> ${OUTPUT}
-  printf "${DB_CHECK_RESULT}"           >> ${OUTPUT}
-  printf "${DB_GENERAL_RESULT}"         >> ${OUTPUT}
+  printf "%s%s%s\n" "${OS_CHECK_HEADER}" "${DB_CHECK_HEADER}" "${DB_GENERAL_HEADER}" >  "${OUTPUT}"
+  printf "%s%s%s"   "${OS_CHECK_RESULT}" "${DB_CHECK_RESULT}" "${DB_GENERAL_RESULT}" >> "${OUTPUT}"
+
+  #printf "${OS_CHECK_HEADER}"           > "${OUTPUT}"
+  #printf "${DB_CHECK_HEADER}"           >> "${OUTPUT}"
+  #printf "${DB_GENERAL_HEADER}\n"       >> "${OUTPUT}"
+  #printf "${OS_CHECK_RESULT}"           >> "${OUTPUT}"
+  #printf "${DB_CHECK_RESULT}"           >> "${OUTPUT}"
+  #printf "${DB_GENERAL_RESULT}"         >> "${OUTPUT}"
 }
 
 
 # ========== Main ========== #
-echo $(date) > ${LOG}
+date > "${LOG}"
 
 Check_OS
 Get_oracle_env
