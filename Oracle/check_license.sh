@@ -23,7 +23,7 @@ function Check_OS() {
   OS=$(cat /etc/redhat-release)
   OS_ARCH=$(uname -i)
   MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{printf "%.2f", $2/1024/1024}')
-  CPU_MODEL=$(grep 'model name' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
+  CPU_MODEL=$(grep 'model name' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1 | sed 's/^ *//g')
   CPU_COUNT=$(grep -c ^processor /proc/cpuinfo)
   CPU_CORE_COUNT=$(grep 'cpu cores' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
   CPU_SOCKET_COUNT=$(grep 'physical id' /proc/cpuinfo | sort -u | wc -l)
