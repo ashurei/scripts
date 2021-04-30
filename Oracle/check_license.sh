@@ -2,7 +2,7 @@
 ########################################################
 # Description : Check Oracle license feature
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.04.28 by ashurei
+# Last Update DATE : 2021.04.30 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
@@ -10,16 +10,16 @@ BINDIR="/tmp/oracle_license"
 
 export LANG=C
 DATE=$(date '+%Y%m%d')
-SPOOL="${BINDIR}/result.log"
-OUTPUT="${BINDIR}/$(hostname)_license_${DATE}.out"
-LOG="${BINDIR}/$(hostname)_license_${DATE}.log"
-GENERAL_RAW="db_general_check.rawdata"
-OPTION_RAW="db_check.rawdata"
+HOSTNAME=$(hostname)
+RESULT="${BINDIR}/result.log"
+OUTPUT="${BINDIR}/${HOSTNAME}_license_${DATE}.out"
+LOG="${BINDIR}/${HOSTNAME}_license_${DATE}.log"
+SET_VAL="set pagesize 0 feedback off verify off heading off echo off timing off line 500"
+OPTION_RAW="${HOSTNAME}_oracle_option_${DATE}.rawdata"
 
 # ========== Functions ========== #
 ### OS Check
 function Check_OS() {
-  HOSTNAME=$(hostname)
   OS=$(cat /etc/redhat-release)
   OS_ARCH=$(uname -i)
   MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{printf "%.2f", $2/1024/1024}')
@@ -40,7 +40,7 @@ function Check_OS() {
   OS_CHECK_RESULT="$HOSTNAME|$OS|$OS_ARCH|$MEMORY_SIZE|$CPU_MODEL|$CPU_COUNT|$CPU_CORE_COUNT|$CPU_SOCKET_COUNT|$HYPERTHREADING|"
 }
 
-# Get Oracle environment variable
+### Get Oracle environment variable
 function Get_oracle_env() {
   ORACLE_USER=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $1}')
   ORACLE_SID=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $11}' | cut -d"_" -f3)
@@ -66,8 +66,7 @@ function Cmd_sqlplus() {
   fi
 
   sqlplus -silent / as sysdba 2>/dev/null << EOF
-set pagesize 0 feedback off verify off heading off echo off timing off line 500
-spool ${SPOOL}
+$1
 $2
 exit
 EOF
@@ -75,13 +74,13 @@ EOF
   # Recover glogin.sql
   if [ "${IS_GLOGIN}" -gt 0 ]
   then
-    sudo mv "${GLOGIN}"_old "${GLOGIN}"
+    mv "${GLOGIN}"_old "${GLOGIN}"
   fi
 }
 
 ### Check Oracle version
 function Check_version() {
-  ORACLE_VERSION=$(Cmd_sqlplus "${ORACLE_USER}" "select version from v\$instance;")
+  ORACLE_VERSION=$(Cmd_sqlplus "${SET_VAL}" "select version from v\$instance;")
   ORACLE_MAJOR_VERSION=$(echo "${ORACLE_VERSION}" | cut -d"." -f1)
 
   number='[0-9]'
@@ -97,105 +96,7 @@ function Check_version() {
 
 ### Check Oracle general configuration
 function Check_general () {
-  if [ "${ORACLE_MAJOR_VERSION}" == 11 ]
-  then
-    Cmd_sqlplus "${ORACLE_USER}" "${SQL_ORACLE_GENERAL_11G}" > "${GENERAL_RAW}"
-    Print_Oracle_general_result
-  elif [ "${ORACLE_MAJOR_VERSION}" -ge 12 ]
-  then
-    Cmd_sqlplus "${ORACLE_USER}" "${SQL_ORACLE_GENERAL_12G}" > "${GENERAL_RAW}"
-    Set_option_var
-    Print_Oracle_general_result
- fi
-}
-
-function Print_Oracle_general_result() {
-  #echo "DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH\n"
-  #cat ${SPOOL} # | awk -F\| '{print $1,$2,$3,$4,$5,$6,$7,$8}'
-  DB_GENERAL_HEADER="DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH"
-  DB_GENERAL_RESULT=$(sed "s/  //g" ${SPOOL})
-}
-
-function Set_option_var() {
-  Check_option_var ${SPOOL} ".Database Gateway"                                 "DATABASE_GATEWAY"
-  Check_option_var ${SPOOL} ".Exadata"                                          "EXADATA"
-  Check_option_var ${SPOOL} ".GoldenGate"                                       "GOLDENGATE"
-  Check_option_var ${SPOOL} ".HW"                                               "HW"
-  Check_option_var ${SPOOL} ".Pillar Storage"                                   "PILLARSTORAGE"
-  Check_option_var ${SPOOL} "Active Data Guard"                                 "ADG"
-  Check_option_var ${SPOOL} "Active Data Guard or Real Application Clusters"    "ADG_RAC"
-  Check_option_var ${SPOOL} "Advanced Analytics"                                "AA"
-  Check_option_var ${SPOOL} "Advanced Compression"                              "AC"
-  Check_option_var ${SPOOL} "Advanced Security"                                 "AS"
-  Check_option_var ${SPOOL} "Database In-Memory"                                "DIM"
-  Check_option_var ${SPOOL} "Database Vault"                                    "DV"
-  Check_option_var ${SPOOL} "Diagnostics Pack"                                  "DP"
-  Check_option_var ${SPOOL} "Label Security"                                    "LS"
-  Check_option_var ${SPOOL} "Multitenant"                                       "MT"
-  Check_option_var ${SPOOL} "OLAP"                                              "OLAP"
-  Check_option_var ${SPOOL} "Partitioning"                                      "PARTITION"
-  Check_option_var ${SPOOL} "RAC or RAC One Node"                               "RAC_ONENODE"
-  Check_option_var ${SPOOL} "Real Application Clusters"                         "RAC"
-  Check_option_var ${SPOOL} "Real Application Clusters One Node"                "ONENODE"
-  Check_option_var ${SPOOL} "Real Application Testing"                          "RAT"
-  Check_option_var ${SPOOL} "Spatial and Graph"                                 "SPATIAL"
-  Check_option_var ${SPOOL} "Tuning Pack"                                       "TUNING"
-}
-
-function Check_option_var() {
-  #if [[ -z $(grep "${2}" ${SPOOL} | grep -v "NO_USAGE" ) ]]
-  if grep -q "${2}" ${SPOOL} | grep -v "NO_USAGE"
-  then
-    eval "$3"=0   # NO_USAGE ==> 0
-  else
-    option=$(grep "${2}" ${SPOOL} | cut -d"|" -f6 | grep -cv "NO_USAGE")
-    #eval $3="${#option[@]}"     # Count of options
-    eval "$3"="${option}"
-  fi
-}
-
-
-### Check Oracle option
-function Check_option () {
-  if [ "${ORACLE_MAJOR_VERSION}" == 11 ]
-  then
-    Cmd_sqlplus "${ORACLE_USER}" "${SQL_ORACLE_CHECK_11G}" > "${OPTION_RAW}"
-    Set_option_var
-    Print_Oracle_check_result
-  elif [ "${ORACLE_MAJOR_VERSION}" -ge 12 ]
-  then
-    Cmd_sqlplus "${ORACLE_USER}" "${SQL_ORACLE_CHECK_12G}" > "${OPTION_RAW}"
-    Set_option_var
-    Print_Oracle_check_result
-  else
-    echo "This script is for 11g over." >> "${LOG}"
-    exit
-  fi
-}
-
-function Print_Oracle_check_result() {
-  #cat ${SPOOL} | awk -F\| '{
-#name=$4;
-#detail=$5;
-#usage=$6;
-#if ( usage=="NO_USAGE" ) color=" \033[0;32m";
-#else color=" \033[0;31m";
-#print "\033[0m" name "|" detail "|" color usage;
-#}' | sort
-#printf "\033[0m"
-
-  DB_CHECK_HEADER=$(printf ".Database Gateway|.Exadata|.GoldenGate|.HW|.Pillar Storage|Active Data Guard|Active Data Guard or Real Application Clusters|Advanced Analytics|Advanced Compression|Advanced Security|Database In-Memory|Database Vault|Diagnostics Pack|Label Security|Multitenant|OLAP|Partitioning|RAC or RAC One Node|Real Application Clusters|Real Application Clusters One Node|Real Application Testing|Spatial and Graph|Tuning Pack|")
-  DB_CHECK_RESULT="${DATABASE_GATEWAY}|${EXADATA}|${GOLDENGATE}|${HW}|${PILLARSTORAGE}|${ADG}|${ADG_RAC}|${AA}|${AC}|${AS}|${DIM}|${DV}|${DP}|${LS}|${MT}|${OLAP}|${PARTITION}|${RAC_ONENODE}|${RAC}|${ONENODE}|${RAT}|${SPATIAL}|${TUNING}|"
-}
-
-function Create_output () {
-  printf "%s%s%s\n" "${OS_CHECK_HEADER}" "${DB_CHECK_HEADER}" "${DB_GENERAL_HEADER}" >  "${OUTPUT}"
-  printf "%s%s%s"   "${OS_CHECK_RESULT}" "${DB_CHECK_RESULT}" "${DB_GENERAL_RESULT}" >> "${OUTPUT}"
-}
-
-
-# ========== SQL  ========== #
-SQL_ORACLE_GENERAL_11G="
+  SQL_ORACLE_GENERAL_11G="
 SELECT
      HOST_NAME||  '|' ||
      DATABASE_NAME|| '|' ||
@@ -238,7 +139,7 @@ SELECT
 ;
 "
 
-SQL_ORACLE_GENERAL_12G="
+  SQL_ORACLE_GENERAL_12G="
 SELECT
      HOST_NAME||  '|' ||
      DATABASE_NAME|| '|' ||
@@ -282,7 +183,59 @@ SELECT
 ;
 "
 
-SQL_ORACLE_CHECK_11G="
+  if [ "${ORACLE_MAJOR_VERSION}" == 11 ]
+  then
+    Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_GENERAL_11G}" > ${RESULT}
+  elif [ "${ORACLE_MAJOR_VERSION}" -ge 12 ]
+  then
+    Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_GENERAL_12G}" > ${RESULT}
+  fi
+
+  DB_GENERAL_HEADER="DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH"
+  DB_GENERAL_RESULT=$(sed "s/  //g" ${RESULT})
+}
+
+function Set_option_var() {
+  Check_option_var ${RESULT} ".Database Gateway"                                 "DATABASE_GATEWAY"
+  Check_option_var ${RESULT} ".Exadata"                                          "EXADATA"
+  Check_option_var ${RESULT} ".GoldenGate"                                       "GOLDENGATE"
+  Check_option_var ${RESULT} ".HW"                                               "HW"
+  Check_option_var ${RESULT} ".Pillar Storage"                                   "PILLARSTORAGE"
+  Check_option_var ${RESULT} "Active Data Guard"                                 "ADG"
+  Check_option_var ${RESULT} "Active Data Guard or Real Application Clusters"    "ADG_RAC"
+  Check_option_var ${RESULT} "Advanced Analytics"                                "AA"
+  Check_option_var ${RESULT} "Advanced Compression"                              "AC"
+  Check_option_var ${RESULT} "Advanced Security"                                 "AS"
+  Check_option_var ${RESULT} "Database In-Memory"                                "DIM"
+  Check_option_var ${RESULT} "Database Vault"                                    "DV"
+  Check_option_var ${RESULT} "Diagnostics Pack"                                  "DP"
+  Check_option_var ${RESULT} "Label Security"                                    "LS"
+  Check_option_var ${RESULT} "Multitenant"                                       "MT"
+  Check_option_var ${RESULT} "OLAP"                                              "OLAP"
+  Check_option_var ${RESULT} "Partitioning"                                      "PARTITION"
+  Check_option_var ${RESULT} "RAC or RAC One Node"                               "RAC_ONENODE"
+  Check_option_var ${RESULT} "Real Application Clusters"                         "RAC"
+  Check_option_var ${RESULT} "Real Application Clusters One Node"                "ONENODE"
+  Check_option_var ${RESULT} "Real Application Testing"                          "RAT"
+  Check_option_var ${RESULT} "Spatial and Graph"                                 "SPATIAL"
+  Check_option_var ${RESULT} "Tuning Pack"                                       "TUNING"
+}
+
+function Check_option_var() {
+  if grep -q "${2}" ${RESULT} | grep -v "NO_USAGE"
+  then
+    eval "$3"=0   # NO_USAGE ==> 0
+  else
+    option=$(grep "${2}" ${RESULT} | cut -d"|" -f6 | grep -cv "NO_USAGE")
+    #eval $3="${#option[@]}"     # Count of options
+    eval "$3"="${option}"
+  fi
+}
+
+
+### Check Oracle option
+function Check_option () {
+  SQL_ORACLE_CHECK_11G="
  with
  MAP as (
  -- mapping between features tracked by DBA_FUS and their corresponding database products (options or packs)
@@ -540,7 +493,7 @@ SQL_ORACLE_CHECK_11G="
  ;
 "
 
-SQL_ORACLE_CHECK_12G="
+  SQL_ORACLE_CHECK_12G="
  with
  MAP as (
  -- mapping between features tracked by DBA_FUS and their corresponding database products (options or packs)
@@ -798,6 +751,66 @@ SQL_ORACLE_CHECK_12G="
  ;
 "
 
+  if [ "${ORACLE_MAJOR_VERSION}" == 11 ]
+  then
+    Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_CHECK_11G}" > "${RESULT}"
+  elif [ "${ORACLE_MAJOR_VERSION}" -ge 12 ]
+  then
+    Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_CHECK_12G}" > "${RESULT}"
+  else
+    echo "This script is for 11g over." >> "${LOG}"
+    exit
+  fi
+
+  Set_option_var
+  
+  DB_CHECK_HEADER=$(printf ".Database Gateway|.Exadata|.GoldenGate|.HW|.Pillar Storage|Active Data Guard|Active Data Guard or Real Application Clusters|Advanced Analytics|Advanced Compression|Advanced Security|Database In-Memory|Database Vault|Diagnostics Pack|Label Security|Multitenant|OLAP|Partitioning|RAC or RAC One Node|Real Application Clusters|Real Application Clusters One Node|Real Application Testing|Spatial and Graph|Tuning Pack|")
+  DB_CHECK_RESULT="${DATABASE_GATEWAY}|${EXADATA}|${GOLDENGATE}|${HW}|${PILLARSTORAGE}|${ADG}|${ADG_RAC}|${AA}|${AC}|${AS}|${DIM}|${DV}|${DP}|${LS}|${MT}|${OLAP}|${PARTITION}|${RAC_ONENODE}|${RAC}|${ONENODE}|${RAT}|${SPATIAL}|${TUNING}|"
+  
+  cp ${RESULT} ${OPTION_RAW}
+}
+
+function Create_output () {
+  printf "%s%s%s\n" "${OS_CHECK_HEADER}" "${DB_CHECK_HEADER}" "${DB_GENERAL_HEADER}" >  "${OUTPUT}"
+  printf "%s%s%s"   "${OS_CHECK_RESULT}" "${DB_CHECK_RESULT}" "${DB_GENERAL_RESULT}" >> "${OUTPUT}"
+}
+
+### Collect dba_hist_active_history
+function Check_ASH () {
+  ASH="${BINDIR}/$(hostname)_ASH_${DATE}.out"
+  ASH_VAL="set line 160 pages 10000"
+  SQL1="
+col sample_time for a20
+col sql_id for a15
+col session_state for a13
+col event for a40
+col sql_text for a40
+select  to_char(sample_time, 'YYYYMMDD HH24:MI:SS') sample_time
+                ,session_id
+                ,sql_id
+                ,session_state
+                ,blocking_session
+                ,event
+                ,(select sql_text from v\$sqlarea where sql_id = h.sql_id) sql_text
+from dba_hist_active_sess_history h
+where sample_time > sysdate-1
+order by sample_time;
+"
+
+  SQL2="
+col event for a40
+select  event, count(*)
+from dba_hist_active_sess_history
+where sample_time > sysdate-1
+group by event
+order by 2;
+"
+
+  Cmd_sqlplus "${ASH_VAL}" "${SQL1}" >  "${ASH}"
+  Cmd_sqlplus "${ASH_VAL}" "${SQL2}" >> "${ASH}"
+}
+
+
 
 # ========== Main ========== #
 date > "${LOG}"
@@ -805,10 +818,11 @@ date > "${LOG}"
 Check_OS
 Get_oracle_env
 Check_version
-
 Check_general
 Check_option
 
 Create_output
 
-rm ${SPOOL}
+Check_ASH
+
+rm ${RESULT}
