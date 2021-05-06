@@ -814,6 +814,10 @@ order by 2;
 
 # ========== Main ========== #
 date > "${LOG}"
+if [ ! -d "${BINDIR}" ]
+then
+  mkdir -p "${BINDIR}"
+fi
 
 Check_OS
 Get_oracle_env
