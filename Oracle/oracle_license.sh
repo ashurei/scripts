@@ -2,7 +2,7 @@
 ########################################################
 # Description : Check Oracle license feature
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.04.30 by ashurei
+# Last Update DATE : 2021.05.28 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
@@ -45,10 +45,15 @@ function Get_oracle_env() {
   ORACLE_USER=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $1}')
   ORACLE_SID=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $11}' | cut -d"_" -f3)
 
-  # If ${ORACLE_USER} is exist
+  # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
   then
     ORACLE_HOME=$(env | grep ^ORACLE_HOME | cut -d"=" -f2)
+	# If $ORACLE_HOME is not directory or null
+	if [[ ! -d "${ORACLE_HOME}" && -z "${ORACLE_HOME}" ]]
+	then
+	  exit 1
+	fi
   else
     echo "Oracle Database is not exists on this server." >> "${LOG}"
     exit 1
@@ -62,7 +67,7 @@ function Cmd_sqlplus() {
   IS_GLOGIN=$(sed '/^$/d' "${GLOGIN}" | grep -cv "\-\-")
   if [ "${IS_GLOGIN}" -gt 0 ]
   then
-    mv "${GLOGIN}" "${GLOGIN}"_old
+    /bin/mv "${GLOGIN}" "${GLOGIN}"_old
   fi
 
   sqlplus -silent / as sysdba 2>/dev/null << EOF
@@ -74,7 +79,7 @@ EOF
   # Recover glogin.sql
   if [ "${IS_GLOGIN}" -gt 0 ]
   then
-    mv "${GLOGIN}"_old "${GLOGIN}"
+    /bin/mv "${GLOGIN}"_old "${GLOGIN}"
   fi
 }
 
@@ -189,6 +194,9 @@ SELECT
   elif [ "${ORACLE_MAJOR_VERSION}" -ge 12 ]
   then
     Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_GENERAL_12G}" > ${RESULT}
+  else
+    echo "This script is for 11g over." >> "${LOG}"
+    exit
   fi
 
   DB_GENERAL_HEADER="DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH"
@@ -753,10 +761,10 @@ function Check_option () {
 
   if [ "${ORACLE_MAJOR_VERSION}" == 11 ]
   then
-    Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_CHECK_11G}" > "${RESULT}"
+    Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_CHECK_11G}" > ${RESULT}
   elif [ "${ORACLE_MAJOR_VERSION}" -ge 12 ]
   then
-    Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_CHECK_12G}" > "${RESULT}"
+    Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_CHECK_12G}" > ${RESULT}
   else
     echo "This script is for 11g over." >> "${LOG}"
     exit
@@ -767,7 +775,7 @@ function Check_option () {
   DB_CHECK_HEADER=$(printf ".Database Gateway|.Exadata|.GoldenGate|.HW|.Pillar Storage|Active Data Guard|Active Data Guard or Real Application Clusters|Advanced Analytics|Advanced Compression|Advanced Security|Database In-Memory|Database Vault|Diagnostics Pack|Label Security|Multitenant|OLAP|Partitioning|RAC or RAC One Node|Real Application Clusters|Real Application Clusters One Node|Real Application Testing|Spatial and Graph|Tuning Pack|")
   DB_CHECK_RESULT="${DATABASE_GATEWAY}|${EXADATA}|${GOLDENGATE}|${HW}|${PILLARSTORAGE}|${ADG}|${ADG_RAC}|${AA}|${AC}|${AS}|${DIM}|${DV}|${DP}|${LS}|${MT}|${OLAP}|${PARTITION}|${RAC_ONENODE}|${RAC}|${ONENODE}|${RAT}|${SPATIAL}|${TUNING}|"
   
-  cp ${RESULT} ${OPTION_RAW}
+  /bin/cp ${RESULT} "${OPTION_RAW}"
 }
 
 function Create_output () {
@@ -813,10 +821,11 @@ order by 2;
 
 
 # ========== Main ========== #
-date > "${LOG}"
 if [ ! -d "${BINDIR}" ]
 then
+  set -e
   mkdir -p "${BINDIR}"
+  set +e
 fi
 
 Check_OS
@@ -829,4 +838,4 @@ Create_output
 
 Check_ASH
 
-rm ${RESULT}
+/bin/rm ${RESULT}
