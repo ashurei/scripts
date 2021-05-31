@@ -2,7 +2,7 @@
 ########################################################
 # Description : Check Oracle license feature
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.05.28 by ashurei
+# Last Update DATE : 2021.05.31 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
@@ -18,32 +18,55 @@ SET_VAL="set pagesize 0 feedback off verify off heading off echo off timing off 
 OPTION_RAW="${HOSTNAME}_oracle_option_${DATE}.rawdata"
 
 # ========== Functions ========== #
+### Logging error
+function Print_error() {
+  LOGDATE="[$(date '+%Y%m%d-%H:%M:%S')]"
+  echo "${LOGDATE} $1" >> "${LOG}"
+}
+
 ### OS Check
 function Check_OS() {
   OS=$(cat /etc/redhat-release)
   OS_ARCH=$(uname -i)
   MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{printf "%.2f", $2/1024/1024}')
   CPU_MODEL=$(grep 'model name' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1 | sed 's/^ *//g')
-  CPU_COUNT=$(grep -c ^processor /proc/cpuinfo)
-  CPU_CORE_COUNT=$(grep 'cpu cores' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
   CPU_SOCKET_COUNT=$(grep 'physical id' /proc/cpuinfo | sort -u | wc -l)
+  CPU_CORE_COUNT=$(grep 'cpu cores' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
+  CPU_COUNT=$(grep -c ^processor /proc/cpuinfo)  
 
   # Check Hyperthreading (If siblings is equal cpu_core*2, this server uses hyperthreading.)
   CPU_SIBLINGS=$(grep 'siblings' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
   HYPERTHREADING=0
   if [ "${CPU_SIBLINGS}" -eq $((CPU_CORE_COUNT*2)) ]
   then
-    HYPERTHREADING="HT"
+    HYPERTHREADING=1
+  fi
+  
+  # Check VM using 'lscpu'. If there is not 'lscpu' (ex. RHEL 5.8) decide not VM.
+  LSCPU=$(which lscpu 2>/dev/null)
+  unset ISVM
+  if [ -n "${LSCPU}" ]
+  then
+    ISVM=$(${LSCPU} | grep Hypervisor | awk -F":" '{print $2}' | tr -d ' ')
+  else
+    Print_error "This server does not have 'lscpu'."
+  fi
+  
+  # If "${ISVM}" is null
+  if [ -z "${ISVM}" ]
+  then
+    ISVM="BM"
   fi
 
-  OS_CHECK_HEADER="HOSTNAME|OS|OS_ARCH|MEMORY_SIZE(GB)|CPU_MODEL|CPU_COUNT|CPU_CORE_COUNT|CPU_SOCKET_COUNT|HYPERTHREADING|"
-  OS_CHECK_RESULT="$HOSTNAME|$OS|$OS_ARCH|$MEMORY_SIZE|$CPU_MODEL|$CPU_COUNT|$CPU_CORE_COUNT|$CPU_SOCKET_COUNT|$HYPERTHREADING|"
+  OS_CHECK_HEADER="HOSTNAME|OS|OS_ARCH|MEMORY_SIZE(GB)|CPU_MODEL|VM|CPU_SOCKET_COUNT|CPU_CORE_COUNT|CPU_COUNT|HYPERTHREADING|"
+  OS_CHECK_RESULT="$HOSTNAME|$OS|$OS_ARCH|$MEMORY_SIZE|$CPU_MODEL|$ISVM|$CPU_SOCKET_COUNT|$CPU_CORE_COUNT|$CPU_COUNT|$HYPERTHREADING|"
 }
 
 ### Get Oracle environment variable
 function Get_oracle_env() {
-  ORACLE_USER=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $1}')
-  ORACLE_SID=$(ps aux | grep ora_pmon | grep -v grep | awk '{print $11}' | cut -d"_" -f3)
+  # If there is one more ora_pmon process, get only one because this script is for license check.
+  ORACLE_USER=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | head -1 | awk '{print $1}')
+  ORACLE_SID=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | head -1 | awk '{print $NF}' | cut -d"_" -f3)
 
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
@@ -52,10 +75,11 @@ function Get_oracle_env() {
 	# If $ORACLE_HOME is not directory or null
 	if [[ ! -d "${ORACLE_HOME}" && -z "${ORACLE_HOME}" ]]
 	then
+	  Print_error "There is not ORACLE_HOME."
 	  exit 1
 	fi
   else
-    echo "Oracle Database is not exists on this server." >> "${LOG}"
+    Print_error "Oracle Database is not exists on this server."
     exit 1
   fi
 }
@@ -91,10 +115,10 @@ function Check_version() {
   number='[0-9]'
   if ! [[ "${ORACLE_MAJOR_VERSION}" =~ $number ]]
   then
-    echo "Error: can't check oracle version. Check oracle environment" >> "${LOG}"
-    echo "## Oracle USER : ${ORACLE_USER}" >> "${LOG}"
-    echo "## Oracle HOME : ${ORACLE_HOME}" >> "${LOG}"
-    echo "## Oracle SID : ${ORACLE_SID}" >> "${LOG}"
+    Print_error "Error: can't check oracle version. Check oracle environment"
+    Print_error "## Oracle USER : ${ORACLE_USER}"
+    Print_error "## Oracle HOME : ${ORACLE_HOME}"
+    Print_error "## Oracle SID : ${ORACLE_SID}"
     exit
   fi
 }
@@ -195,7 +219,7 @@ SELECT
   then
     Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_GENERAL_12G}" > ${RESULT}
   else
-    echo "This script is for 11g over." >> "${LOG}"
+    Print_error "This script is for 11g over."
     exit
   fi
 
@@ -766,7 +790,7 @@ function Check_option () {
   then
     Cmd_sqlplus "${SET_VAL}" "${SQL_ORACLE_CHECK_12G}" > ${RESULT}
   else
-    echo "This script is for 11g over." >> "${LOG}"
+    Print_error "This script is for 11g over."
     exit
   fi
 
