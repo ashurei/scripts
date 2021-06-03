@@ -13,7 +13,6 @@ DATE=$(date '+%Y%m%d')
 HOSTNAME=$(hostname)
 RESULT="${BINDIR}/result.log"
 SET_VAL="set pagesize 0 feedback off verify off heading off echo off timing off line 500"
-OUTPUT="${BINDIR}/${HOSTNAME}_license_${DATE}.out"
 
 # ========== Functions ========== #
 ### Logging error
@@ -65,8 +64,8 @@ function Check_OS() {
 ### Get Oracle environment variable
 function Get_oracle_env() {
   # If there is one more ora_pmon process, get only one because this script is for license check.
-  ORACLE_USER=$(ps aux | grep ora_pmon | grep "$(whoami)" | grep -v grep | head -1 | awk '{print $1}')
-  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep "$(whoami)" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+  ORACLE_USER=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | head -1 | awk '{print $1}')
+  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
 
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
@@ -801,16 +800,18 @@ function Check_option () {
   
   DB_CHECK_RESULT="${DATABASE_GATEWAY}|${EXADATA}|${GOLDENGATE}|${HW}|${PILLARSTORAGE}|${ADG}|${ADG_RAC}|${AA}|${AC}|${AS}|${DIM}|${DV}|${DP}|${LS}|${MT}|${OLAP}|${PARTITION}|${RAC_ONENODE}|${RAC}|${ONENODE}|${RAT}|${SPATIAL}|${TUNING}|"
   
-  OPTION_RAW="${HOSTNAME}_oracle_option_${DATE}.rawdata"
+  OPTION_RAW="${BINDIR}/${HOSTNAME}_option_${ORACLE_USER}_${DATE}.rawdata"
   /bin/cp ${RESULT} "${OPTION_RAW}"
 }
 
 ### Create output file
 function Create_output () {
-  local OS_CHECK_HEADER DB_CHECK_HEADER DB_GENERAL_HEADER  
+  local OS_CHECK_HEADER DB_CHECK_HEADER DB_GENERAL_HEADER
   OS_CHECK_HEADER="HOSTNAME|OS|OS_ARCH|MEMORY_SIZE(GB)|CPU_MODEL|MACHINE_TYPE|CPU_SOCKET_COUNT|CPU_CORE_COUNT|CPU_COUNT|HYPERTHREADING|"
   DB_CHECK_HEADER=".Database Gateway|.Exadata|.GoldenGate|.HW|.Pillar Storage|Active Data Guard|Active Data Guard or Real Application Clusters|Advanced Analytics|Advanced Compression|Advanced Security|Database In-Memory|Database Vault|Diagnostics Pack|Label Security|Multitenant|OLAP|Partitioning|RAC or RAC One Node|Real Application Clusters|Real Application Clusters One Node|Real Application Testing|Spatial and Graph|Tuning Pack|"
   DB_GENERAL_HEADER="DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH"
+  
+  OUTPUT="${BINDIR}/${HOSTNAME}_license_${ORACLE_USER}_${DATE}.out"
   printf "%s%s%s\n" "${OS_CHECK_HEADER}" "${DB_CHECK_HEADER}" "${DB_GENERAL_HEADER}" > "${OUTPUT}"
 }
 
