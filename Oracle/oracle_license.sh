@@ -65,8 +65,8 @@ function Check_OS() {
 ### Get Oracle environment variable
 function Get_oracle_env() {
   # If there is one more ora_pmon process, get only one because this script is for license check.
-  ORACLE_USER=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | head -1 | awk '{print $1}')
-  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+  ORACLE_USER=$(ps aux | grep ora_pmon | grep "$(whoami)" | grep -v grep | head -1 | awk '{print $1}')
+  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep "$(whoami)" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
 
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
