@@ -2,7 +2,7 @@
 ########################################################
 # Description : Check Oracle license feature
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.05.31 by ashurei
+# Last Update DATE : 2021.06.03 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
@@ -12,20 +12,22 @@ export LANG=C
 DATE=$(date '+%Y%m%d')
 HOSTNAME=$(hostname)
 RESULT="${BINDIR}/result.log"
-OUTPUT="${BINDIR}/${HOSTNAME}_license_${DATE}.out"
-LOG="${BINDIR}/${HOSTNAME}_license_${DATE}.log"
 SET_VAL="set pagesize 0 feedback off verify off heading off echo off timing off line 500"
-OPTION_RAW="${HOSTNAME}_oracle_option_${DATE}.rawdata"
+OUTPUT="${BINDIR}/${HOSTNAME}_license_${DATE}.out"
 
 # ========== Functions ========== #
 ### Logging error
 function Print_error() {
+  local LOG
+  LOG="${BINDIR}/${HOSTNAME}_license_${DATE}.log"
   LOGDATE="[$(date '+%Y%m%d-%H:%M:%S')]"
   echo "${LOGDATE} $1" >> "${LOG}"
 }
 
 ### OS Check
 function Check_OS() {
+  local OS OS_ARCH MEMORY_SIZE CPU_MODEL CPU_SOCKET_COUNT CPU_CORE_COUNT CPU_COUNT
+  local CPU_SIBLINGS HYPERTHREADING LSCPU MACHINE_TYPE
   OS=$(cat /etc/redhat-release)
   OS_ARCH=$(uname -i)
   MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{printf "%.2f", $2/1024/1024}')
@@ -44,29 +46,27 @@ function Check_OS() {
   
   # Check VM using 'lscpu'. If there is not 'lscpu' (ex. RHEL 5.8) decide not VM.
   LSCPU=$(which lscpu 2>/dev/null)
-  unset ISVM
   if [ -n "${LSCPU}" ]
   then
-    ISVM=$(${LSCPU} | grep Hypervisor | awk -F":" '{print $2}' | tr -d ' ')
+    MACHINE_TYPE=$(${LSCPU} | grep Hypervisor | awk -F":" '{print $2}' | tr -d ' ')
   else
     Print_error "This server does not have 'lscpu'."
   fi
   
-  # If "${ISVM}" is null
-  if [ -z "${ISVM}" ]
+  # If "${MACHINE_TYPE}" is null (No Hypervisor or No 'lscpu')
+  if [ -z "${MACHINE_TYPE}" ]
   then
-    ISVM="BM"
+    MACHINE_TYPE="BM"
   fi
-
-  OS_CHECK_HEADER="HOSTNAME|OS|OS_ARCH|MEMORY_SIZE(GB)|CPU_MODEL|VM|CPU_SOCKET_COUNT|CPU_CORE_COUNT|CPU_COUNT|HYPERTHREADING|"
-  OS_CHECK_RESULT="$HOSTNAME|$OS|$OS_ARCH|$MEMORY_SIZE|$CPU_MODEL|$ISVM|$CPU_SOCKET_COUNT|$CPU_CORE_COUNT|$CPU_COUNT|$HYPERTHREADING|"
+  
+  OS_CHECK_RESULT="$HOSTNAME|$OS|$OS_ARCH|$MEMORY_SIZE|$CPU_MODEL|$MACHINE_TYPE|$CPU_SOCKET_COUNT|$CPU_CORE_COUNT|$CPU_COUNT|$HYPERTHREADING|"
 }
 
 ### Get Oracle environment variable
 function Get_oracle_env() {
   # If there is one more ora_pmon process, get only one because this script is for license check.
   ORACLE_USER=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | head -1 | awk '{print $1}')
-  ORACLE_SID=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | head -1 | awk '{print $NF}' | cut -d"_" -f3)
+  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep $(whoami) | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
 
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
@@ -86,6 +86,7 @@ function Get_oracle_env() {
 
 ### Get Oracle result with sqlplus
 function Cmd_sqlplus() {
+  local GLOGIN IS_GLOGIN
   # If there are options in glogin.sql move the file.
   GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
   IS_GLOGIN=$(sed '/^$/d' "${GLOGIN}" | grep -cv "\-\-")
@@ -125,6 +126,7 @@ function Check_version() {
 
 ### Check Oracle general configuration
 function Check_general () {
+  local SQL_ORACLE_GENERAL_11G SQL_ORACLE_GENERAL_12G
   SQL_ORACLE_GENERAL_11G="
 SELECT
      HOST_NAME||  '|' ||
@@ -223,7 +225,6 @@ SELECT
     exit
   fi
 
-  DB_GENERAL_HEADER="DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH"
   DB_GENERAL_RESULT=$(sed "s/  //g" ${RESULT})
 }
 
@@ -254,6 +255,7 @@ function Set_option_var() {
 }
 
 function Check_option_var() {
+  local option
   if grep -q "${2}" ${RESULT} | grep -v "NO_USAGE"
   then
     eval "$3"=0   # NO_USAGE ==> 0
@@ -267,6 +269,7 @@ function Check_option_var() {
 
 ### Check Oracle option
 function Check_option () {
+  local SQL_ORACLE_CHECK_11G SQL_ORACLE_CHECK_12G OPTION_RAW
   SQL_ORACLE_CHECK_11G="
  with
  MAP as (
@@ -796,20 +799,30 @@ function Check_option () {
 
   Set_option_var
   
-  DB_CHECK_HEADER=$(printf ".Database Gateway|.Exadata|.GoldenGate|.HW|.Pillar Storage|Active Data Guard|Active Data Guard or Real Application Clusters|Advanced Analytics|Advanced Compression|Advanced Security|Database In-Memory|Database Vault|Diagnostics Pack|Label Security|Multitenant|OLAP|Partitioning|RAC or RAC One Node|Real Application Clusters|Real Application Clusters One Node|Real Application Testing|Spatial and Graph|Tuning Pack|")
   DB_CHECK_RESULT="${DATABASE_GATEWAY}|${EXADATA}|${GOLDENGATE}|${HW}|${PILLARSTORAGE}|${ADG}|${ADG_RAC}|${AA}|${AC}|${AS}|${DIM}|${DV}|${DP}|${LS}|${MT}|${OLAP}|${PARTITION}|${RAC_ONENODE}|${RAC}|${ONENODE}|${RAT}|${SPATIAL}|${TUNING}|"
   
+  OPTION_RAW="${HOSTNAME}_oracle_option_${DATE}.rawdata"
   /bin/cp ${RESULT} "${OPTION_RAW}"
 }
 
+### Create output file
 function Create_output () {
-  printf "%s%s%s\n" "${OS_CHECK_HEADER}" "${DB_CHECK_HEADER}" "${DB_GENERAL_HEADER}" >  "${OUTPUT}"
-  printf "%s%s%s"   "${OS_CHECK_RESULT}" "${DB_CHECK_RESULT}" "${DB_GENERAL_RESULT}" >> "${OUTPUT}"
+  local OS_CHECK_HEADER DB_CHECK_HEADER DB_GENERAL_HEADER  
+  OS_CHECK_HEADER="HOSTNAME|OS|OS_ARCH|MEMORY_SIZE(GB)|CPU_MODEL|MACHINE_TYPE|CPU_SOCKET_COUNT|CPU_CORE_COUNT|CPU_COUNT|HYPERTHREADING|"
+  DB_CHECK_HEADER=".Database Gateway|.Exadata|.GoldenGate|.HW|.Pillar Storage|Active Data Guard|Active Data Guard or Real Application Clusters|Advanced Analytics|Advanced Compression|Advanced Security|Database In-Memory|Database Vault|Diagnostics Pack|Label Security|Multitenant|OLAP|Partitioning|RAC or RAC One Node|Real Application Clusters|Real Application Clusters One Node|Real Application Testing|Spatial and Graph|Tuning Pack|"
+  DB_GENERAL_HEADER="DB_HOSTNAME|DB_NAME|OPEN_MODE|DATABASE_ROLE|CREATED|DBID|BANNER|MAX_TIMESTAMP|MAX_CPU_COUNT|MAX_CPU_CORE_COUNT|MAX_CPU_SOCKET_COUNT|LAST_TIMESTAMP|LAST_CPU_COUNT|LAST_CPU_CORE_COUNT|LAST_CPU_SOCKET_COUNT|CONTROL_MANAGEMENT_PACK_ACCESS|ENABLE_DDL_LOGGING|CDB|DB_VERSION|DB_PATCH"
+  printf "%s%s%s\n" "${OS_CHECK_HEADER}" "${DB_CHECK_HEADER}" "${DB_GENERAL_HEADER}" > "${OUTPUT}"
+}
+
+### Insert data to output file
+function Insert_output () {
+  printf "%s%s%s\n" "${OS_CHECK_RESULT}" "${DB_CHECK_RESULT}" "${DB_GENERAL_RESULT}" >> "${OUTPUT}"
 }
 
 ### Collect dba_hist_active_history
 function Check_ASH () {
-  ASH="${BINDIR}/$(hostname)_ASH_${DATE}.out"
+  local ASH ASH_VAL SQL1 SQL2
+  ASH="${BINDIR}/$(hostname)_ASH_${ORACLE_SID}_${DATE}.out"
   ASH_VAL="set line 160 pages 10000"
   SQL1="
 col sample_time for a20
@@ -818,12 +831,12 @@ col session_state for a13
 col event for a40
 col sql_text for a40
 select  to_char(sample_time, 'YYYYMMDD HH24:MI:SS') sample_time
-                ,session_id
-                ,sql_id
-                ,session_state
-                ,blocking_session
-                ,event
-                ,(select sql_text from v\$sqlarea where sql_id = h.sql_id) sql_text
+       ,session_id
+       ,sql_id
+       ,session_state
+       ,blocking_session
+       ,event
+       ,(select sql_text from v\$sqlarea where sql_id = h.sql_id) sql_text
 from dba_hist_active_sess_history h
 where sample_time > sysdate-1
 order by sample_time;
@@ -845,6 +858,7 @@ order by 2;
 
 
 # ========== Main ========== #
+# Create target directory
 if [ ! -d "${BINDIR}" ]
 then
   set -e
@@ -854,12 +868,15 @@ fi
 
 Check_OS
 Get_oracle_env
-Check_version
-Check_general
-Check_option
-
 Create_output
 
-Check_ASH
+for ORACLE_SID in ${ORACLE_SIDs}
+do
+  Check_version
+  Check_general
+  Check_option
+  Insert_output
+  Check_ASH
+done
 
 /bin/rm ${RESULT}
