@@ -2,12 +2,12 @@
 ########################################################
 # Description : Data Collection Tool of Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.06.25 by ashurei
+# Last Update DATE : 2021.06.30 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
-BINDIR="/tmp/oracle_license"
-SCRIPT_VER="2021.06.25.r03"
+BINDIR="/tmp/DCT-oracle"
+SCRIPT_VER="2021.06.30.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -49,16 +49,25 @@ function Get_oracle_env() {
     CRSCTL="${GRID_HOME}/bin/crsctl"
     SRVCTL="${GRID_HOME}/bin/srvctl"
   fi
+  
+  # Check ASM environment
+  isASM=$(ps aux | grep -v grep | grep -c asm_pmon)
 }
 
 ### Create output file
 function Create_output () {
+  local DEL_LOG DEL_OUT
+  
   # Delete log files 390 days+ ago
-  find ${BINDIR:?}/DCT_"${HOSTNAME}"_*.log -mtime +390 -type f -delete 2>&1
+  DEL_LOG=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_*.log -mtime +390 -type f -delete 2>&1)
+  if [ -n "${DEL_LOG}" ]   # If $DEL_LOG is exists write to Print_log.
+  then
+    Print_log "${DEL_LOG}"
+  fi
 
   # Delete output files 14 days+ ago
   DEL_OUT=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_*.out -mtime +14 -type f -delete 2>&1)
-  if [ -n "${DEL_OUT}" ]
+  if [ -n "${DEL_OUT}" ]   # If $DEL_OUT is exists write to Print_log.
   then
     Print_log "${DEL_OUT}"
   fi
@@ -109,13 +118,26 @@ function OSmeminfo () {
   } >> "${OUTPUT}" 2>&1
 }
 
+### /etc/security/limits.conf
+function OSlimits () {
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### /etc/security/limits.conf"
+    grep -v "^#" /etc/security/limits.conf | sed '/^$/d'
+    echo "# /etc/security/limits.d"
+    /bin/ls /etc/security/limits.d
+  } >> "${OUTPUT}" 2>&1
+}
+
 ### Kernel parameter
-function OSsysctl () {
+function OSkernel_parameter () {
   # Insert to output file
   {
     echo $recsep
     echo "### Kernel parameter"
-    /usr/sbin/sysctl -a 2>/dev/null
+    /sbin/sysctl -a 2>/dev/null
+    echo
   } >> "${OUTPUT}" 2>&1
 }
 
@@ -187,7 +209,6 @@ function OScommon () {
     MACHINE_TYPE="BM"
   fi
 
-  #OS_CHECK_RESULT="$HOSTNAME|$OS|$OS_ARCH|$MEMORY_SIZE|$CPU_MODEL|$MACHINE_TYPE|$CPU_SOCKET_COUNT|$CPU_CORE_COUNT|$CPU_COUNT|$HYPERTHREADING|"
   # Insert to output file
   {
     echo $recsep
@@ -207,26 +228,11 @@ function OScommon () {
 
 ### Get Oracle result with sqlplus
 function Cmd_sqlplus() {
-  local GLOGIN IS_GLOGIN
-  # If there are options in glogin.sql move the file.
-  GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
-  IS_GLOGIN=$(sed '/^$/d' "${GLOGIN}" | grep -cv "\-\-")
-  if [ "${IS_GLOGIN}" -gt 0 ]
-  then
-    /bin/mv "${GLOGIN}" "${GLOGIN}"_old
-  fi
-
   sqlplus -silent / as sysdba 2>/dev/null << EOF
 $1
 $2
 exit
 EOF
-
-  # Recover glogin.sql
-  if [ "${IS_GLOGIN}" -gt 0 ]
-  then
-    /bin/mv "${GLOGIN}"_old "${GLOGIN}"
-  fi
 }
 
 ### Check Oracle version
@@ -347,7 +353,6 @@ function Check_option_general () {
 
   Set_general_var
 
-  #DB_GENERAL_RESULT=$(sed "s/  //g" ${RESULT})
   # Insert to output file
   {
     echo $recsep
@@ -371,7 +376,7 @@ function Check_option_general () {
     echo "ENABLE_DDL_LOGGING:$ENABLE_DDL_LOGGING"
     echo "CDB:$CDB"
     echo "VERSION:$VERSION"
-    echo "DB_GENERAL:$DB_GENERAL"
+    echo "DB_PATCH:$DB_PATCH"
   } >> "${OUTPUT}"
 }
 
@@ -395,13 +400,13 @@ function Set_general_var() {
   Check_general_var ${RESULT} "ENABLE_DDL_LOGGING"             17
   Check_general_var ${RESULT} "CDB"                            18
   Check_general_var ${RESULT} "VERSION"                        19
-  Check_general_var ${RESULT} "DB_GENERAL"                     20
+  Check_general_var ${RESULT} "DB_PATCH"                       20
 }
 
 function Check_general_var() {
   local option
   option=$(cut -d"|" -f"${3}" ${RESULT})
-  eval "$2"=\""${option}"\"        # Because of space
+  eval "$2"=\""${option}"\"    # Insert "\" because the space of ${option}
 }
 
 ### Check Oracle option
@@ -933,7 +938,6 @@ function Check_option_ULA () {
 
   Set_option_var
 
-  #DB_CHECK_RESULT="${DATABASE_GATEWAY}|${EXADATA}|${GOLDENGATE}|${HW}|${PILLARSTORAGE}|${ADG}|${ADG_RAC}|${AA}|${AC}|${AS}|${DIM}|${DV}|${DP}|${LS}|${MT}|${OLAP}|${PARTITION}|${RAC_ONENODE}|${RAC}|${ONENODE}|${RAT}|${SPATIAL}|${TUNING}|"
   # Insert to output file
   {
     echo $recsep
@@ -1057,7 +1061,7 @@ function ORAcommon () {
     where thread# = (select thread# from v\$instance)
 	  and COMPLETION_TIME > sysdate -7;
    "
-
+   
   # Insert to output file
   {
     echo $recsep
@@ -1088,6 +1092,52 @@ function ORAcommon () {
   $SQLarchivelog_1day_mbytes
   exit
 EOF
+
+  local isOSW OSWATCHER AUDIT_FILE_DEST AUDIT_FILE_COUNT
+  # OS Watcher
+  isOSW=$(ps aux | grep -v grep | grep -c OSW)
+  if [ "${isOSW}" -ge 0 ]
+  then
+    OSWATCHER="Y"
+  else
+    OSWATCHER="N"
+  fi
+
+  # Audit file
+  AUDIT_FILE_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='audit_file_dest';")
+  AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST}" -maxdepth 1 -name "*.aud" | wc -l)
+  
+  # Insert to output file
+  {
+    echo "OSWATCHER:$OSWATCHER"
+	echo "AUDIT_FILE_COUNT:$AUDIT_FILE_COUNT"
+  } >> "${OUTPUT}"
+}
+
+### Oracle user resource limit
+function ORAosuser () {
+  local uid gid ushell ulimit_n ulimit_u ulimit_s ulimit_l
+  
+  uid=$(grep "${ORACLE_USER}": /etc/passwd | awk -F":" '{print $3}')
+  gid=$(grep "${ORACLE_USER}": /etc/passwd | awk -F":" '{print $4}')
+  ushell=$(grep "${ORACLE_USER}": /etc/passwd | awk -F":" '{print $NF}')
+  ulimit_n=$(ulimit -n) # nofile
+  ulimit_u=$(ulimit -u) # nproc
+  ulimit_s=$(ulimit -s) # stack
+  ulimit_l=$(ulimit -l) # memlock
+  
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### Oracle OS user resource limit"
+    echo "uid:$uid"
+    echo "gid:$gid"
+    echo "shell:$ushell"
+    echo "ulimit(nofile):$ulimit_n"
+    echo "ulimit(process):$ulimit_u"
+    echo "ulimit(stack):$ulimit_s"
+    echo "ulimit(memlock):$ulimit_l"
+  } >> "${OUTPUT}"
 }
 
 ### Oracle Database Patch
@@ -1632,34 +1682,25 @@ function ORAetc () {
 EOF
 }
 
-### Oracle user resource limit
-function ORAosuser () {
-  local uid gid ushell ulimit_n ulimit_u ulimit_s ulimit_l
-  
-  uid=$(grep "${ORACLE_USER}": /etc/passwd | awk -F":" '{print $3}')
-  gid=$(grep "${ORACLE_USER}": /etc/passwd | awk -F":" '{print $4}')
-  ushell=$(grep "${ORACLE_USER}": /etc/passwd | awk -F":" '{print $NF}')
-  ulimit_n=$(ulimit -n) # nofile
-  ulimit_u=$(ulimit -u) # nproc
-  ulimit_s=$(ulimit -s) # stack
-  ulimit_l=$(ulimit -l) # memlock
-  uid_grid=$(grep "${GRID_USER}": /etc/passwd | awk -F":" '{print $3}')
-  gid_grid=$(grep "${GRID_USER}": /etc/passwd | awk -F":" '{print $4}')
-  
+### Oracle Listener
+function ORAlistener {
+  local LISTENERs LISTENER_USER LISTENER_HOME LISTENER_NAME ORACLE_HOME
+
   # Insert to output file
   {
     echo $recsep
-    echo "### Oracle OS user resource limit"
-    echo "uid:$uid"
-    echo "gid:$gid"
-    echo "shell:$ushell"
-    echo "ulimit(nofile):$ulimit_n"
-    echo "ulimit(process):$ulimit_u"
-    echo "ulimit(stack):$ulimit_s"
-    echo "ulimit(memlock):$ulimit_l"
-    echo "### Grid OS user"
-    echo "uid:$uid_grid"
-    echo "gid:$gid_grid"
+    echo "### Oracle Listener"
+    # (USER):(BINARY_PATH):(LISTENER_NAME)
+    LISTENERs=$(ps aux | grep tnslsnr | grep -v grep | awk '{print $1":"$11":"$12}' | sort)
+    for listener in ${LISTENERs}
+    do
+      LISTENER_USER=$(echo "${listener}" | cut -d":" -f1)
+      LISTENER_NAME=$(echo "${listener}" | cut -d":" -f3)
+      ORACLE_HOME=$(echo "${listener}" | cut -d":" -f2 | awk -F"/bin" '{print $1}')
+      echo "# ${LISTENER_USER}:${ORACLE_HOME}:${LISTENER_NAME}"
+      "${ORACLE_HOME}"/bin/lsnrctl status "${LISTENER_NAME}"
+      echo
+    done
   } >> "${OUTPUT}"
 }
 
@@ -1830,6 +1871,24 @@ order by sample_time;
   Cmd_sqlplus "${COLLECT_VAL}" "${SQLash}" >> "${OUTPUT}"
 }
 
+### Oracle alert log
+function ORAalert () {
+  local DIAG_DEST ALERT_LOG
+  DIAG_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='diagnostic_dest';")
+  DATABASE_NAME=$(Cmd_sqlplus "${COMMON_VAL}" "select name from v\$database;" | tr '[:upper:]' '[:lower:]')
+  ALERT_LOG="${DIAG_DEST}/diag/rdbms/${DATABASE_NAME}/${ORACLE_SID}/trace/alert_${ORACLE_SID}.log"
+  
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### Oracle alert log (100 lines)"
+    if [ -f "${ALERT_LOG}" ]
+    then
+      /usr//bin/tail -100 "${ALERT_LOG}"
+    fi
+  } >> "${OUTPUT}"
+}
+
 ### Collect hidden parameter
 function ORAparameter {
   local SQLparameter
@@ -1839,8 +1898,8 @@ function ORAparameter {
   {
     echo $recsep
     echo "### Oracle Parameter"
+	Cmd_sqlplus "${COMMON_VAL}" "${SQLparameter}"
   } >> "${OUTPUT}"
-  Cmd_sqlplus "${COMMON_VAL}" "${SQLparameter}" >> "${OUTPUT}"
 }
 
 ### Grid Common information
@@ -1881,6 +1940,24 @@ function CRScommon () {
     echo "CLUSTER_NAME:$CLUSTER_NAME"
     echo "CLUSTER_NODENAME:$CLUSTER_NODENAME"
     echo "CLUSTER_NODES:$CLUSTER_NODES"
+  } >> "${OUTPUT}"
+}
+
+### Grid user resource limit
+function CRSosuser () {
+  local uid gid ushell
+  
+  uid=$(grep "${GRID_USER}": /etc/passwd | awk -F":" '{print $3}')
+  gid=$(grep "${GRID_USER}": /etc/passwd | awk -F":" '{print $4}')
+  ushell=$(grep "${GRID_USER}": /etc/passwd | awk -F":" '{print $NF}')
+  
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### Grid OS user"
+    echo "uid:$uid"
+    echo "gid:$gid"
+    echo "shell:$ushell"
   } >> "${OUTPUT}"
 }
 
@@ -2016,6 +2093,96 @@ function CRScssd () {
   } >> "${OUTPUT}"
 }
 
+### ASM Common
+function ASMcommon () {
+  local AUDIT_FILE_DEST AUDIT_FILE_COUNT
+  AUDIT_FILE_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='audit_file_dest';")
+  AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST}" -maxdepth 1 -name "*.aud" | wc -l)
+
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### ASM common"
+    echo "ASM_SID:$ORACLE_SID"
+    echo "AUDIT_FILE_COUNT:$AUDIT_FILE_COUNT"
+  } >> "${OUTPUT}"
+}
+
+### ASM lsdg
+function ASMlsdg () {
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### ASM lsdg"
+    "${GRID_HOME}"/bin/asmcmd lsdg
+  } >> "${OUTPUT}" 2>&1
+}
+
+### ASM configure
+function ASMconfigure () {
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### ASM configure"
+    /usr/sbin/oracleasm configure
+  } >> "${OUTPUT}" 2>&1
+}
+
+### ASM listdisks
+function ASMlistdisks () {
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### ASM configure"
+    /usr/sbin/oracleasm listdisks | xargs oracleasm querydisk -p 
+  } >> "${OUTPUT}" 2>&1
+}
+
+### ASM systemctl
+function ASMsystemctl () {
+  # If 'systemctl' exists
+  if [ -f /bin/systemctl ]
+  then
+    SERVICE=$(/bin/systemctl status oracleasm | grep "Loaded" | cut -d"(" -f2 | cut -d";" -f1)
+    # Insert to output file
+    {
+      echo $recsep
+      echo "### ASM systemctl"
+      /bin/cat "${SERVICE}"
+    } >> "${OUTPUT}" 2>&1
+  fi
+}
+
+### ASM alert log
+function ASMalert () {
+  local DIAG_DEST ALERT_LOG
+  DIAG_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='diagnostic_dest';")
+  ALERT_LOG="${DIAG_DEST}/diag/asm/+asm/${ORACLE_SID}/trace/alert_${ORACLE_SID}.log"
+  
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### ASM alert log (100 lines)"
+    if [ -f "${ALERT_LOG}" ]
+    then
+      /usr/bin/tail -100 "${ALERT_LOG}"
+    fi
+  } >> "${OUTPUT}"
+}
+
+### ASM hidden parameter
+function ASMparameter {
+  local SQLparameter
+  SQLparameter="select ksppinm||' '||ksppstvl from x\$ksppi a, x\$ksppsv b where a.indx=b.indx order by ksppinm;"
+
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### ASM Parameter"
+	Cmd_sqlplus "${COMMON_VAL}" "${SQLparameter}"
+  } >> "${OUTPUT}"
+}
+
 ### Logging error
 function Print_log() {
   local LOG LOGDATE COLLECT_YEAR
@@ -2026,7 +2193,9 @@ function Print_log() {
 }
 
 # ========== Main ========== #
-Print_log "Start collect"
+# Initial .bash_profile
+source ~/.bash_profile
+
 # Create target directory
 if [ ! -d "${BINDIR}" ]
 then
@@ -2035,18 +2204,29 @@ then
   set +e
 fi
 
+Print_log "Start collect"
+
 # Get Oracle environment data
 Get_oracle_env
 
 ### Oracle Database
 for ORACLE_SID in ${ORACLE_SIDs}
 do
+  # If there are options in glogin.sql move the file.
+  GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
+  isGLOGIN=$(sed '/^$/d' "${GLOGIN}" | grep -cv "\-\-")
+  if [ "${isGLOGIN}" -gt 0 ]
+  then
+    /bin/mv "${GLOGIN}" "${GLOGIN}"_old
+  fi
+  
   Create_output
   OScommon
   OSdf
   OShosts
   OSmeminfo
-  OSsysctl
+  OSlimits
+  OSkernel_parameter
   OSrpm
   OSntp
   OSnsswitch
@@ -2055,24 +2235,33 @@ do
   Check_option_ULA
 
   ORAcommon
+  ORAosuser
   ORApatch
   ORAprivilege
   ORAjob
   ORAcapacity
   ORAetc
-  ORAosuser
+  ORAlistener
   ORApfile
   ORAevent_count
   ORAevent_group
   ORAredo_switch
   ORAash
+  ORAalert
   ORAparameter
+  
+  # Recover glogin.sql
+  if [ "${isGLOGIN}" -gt 0 ]
+  then
+    /bin/mv "${GLOGIN}"_old "${GLOGIN}"
+  fi
 done
 
 ### Oracle Grid
 if [ -n "${GRID_USER}" ]
 then
   CRScommon
+  CRSosuser
   CRSpatch
   CRSstatRes
   CRSstatResInit
@@ -2081,6 +2270,18 @@ then
   CRSresource
   CRSoifcfg
   CRScssd
+  if [ "${isASM}" -ge 0 ]
+  then
+    ORACLE_HOME=${GRID_HOME}
+    ORACLE_SID=$(ps aux | grep asm_pmon | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+    ASMcommon
+    ASMlsdg
+    ASMconfigure
+    ASMlistdisks
+    ASMsystemctl
+	ASMalert
+	ASMparameter
+  fi
 fi
 
 /bin/rm ${RESULT}
