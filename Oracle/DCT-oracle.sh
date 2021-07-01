@@ -1831,7 +1831,7 @@ order by to_char(first_time,'YYYY/MM/DD') desc;
   } >> "${OUTPUT}"
 }
 
-### Collect count of event
+### Collect count of event per day
 function ORAevent_count {
   local SQLevent_count
   SQLevent_count="
@@ -1845,7 +1845,7 @@ function ORAevent_count {
   # Insert to output file
   {
     echo $recsep
-    echo "# Oracle Event count per day from ASH"
+    echo "# Oracle count of event per day from ASH"
     Cmd_sqlplus "${COMMON_VAL}" "${SQLevent_count}"
   } >> "${OUTPUT}"
 }
@@ -1854,6 +1854,26 @@ function ORAevent_count {
 function ORAevent_group {
   local SQLevent_group
   SQLevent_group="
+   select event ||'---'|| count(*)
+     from dba_hist_active_sess_history
+    where sample_time > sysdate-1
+      and event is not null
+    group by event
+    order by count(*) desc;
+   "
+
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### Oracle count of event from ASH"
+    Cmd_sqlplus "${COMMON_VAL}" "${SQLevent_group}"
+  } >> "${OUTPUT}"
+}
+
+### Oracle ASH with event
+function ORAash {
+  local SQLash
+  SQLash="
    col username for a12
    col sql_id for a15
    col program for a30
@@ -1877,8 +1897,8 @@ function ORAevent_group {
   # Insert to output file
   {
     echo $recsep
-    echo "### Oracle Event count from ASH"
-    Cmd_sqlplus "${COLLECT_VAL}" "${SQLevent_group}"
+    echo "### Oracle ASH with event"
+    Cmd_sqlplus "${COLLECT_VAL}" "${SQLash}"
   } >> "${OUTPUT}"
 }
 
@@ -2256,6 +2276,7 @@ do
   ORAredo_switch
   ORAevent_count
   ORAevent_group
+  ORAash
   ORAalert
   ORAparameter
   
