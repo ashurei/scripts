@@ -2,12 +2,12 @@
 ########################################################
 # Description : Data Collection Tool of Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.06.30 by ashurei
+# Last Update DATE : 2021.07.01 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.06.30.r01"
+SCRIPT_VER="2021.07.01.r03"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -83,6 +83,62 @@ function Create_output () {
     echo "ORACLE_SID:${ORACLE_SID}"
     echo "ORACLE_HOME:${ORACLE_HOME}"
   } > "${OUTPUT}" 2>&1
+}
+
+### OS Check
+function OScommon () {
+  local OS OS_ARCH MEMORY_SIZE CPU_MODEL CPU_SOCKET_COUNT CPU_CORE_COUNT CPU_COUNT
+  local CPU_SIBLINGS HYPERTHREADING LSCPU MACHINE_TYPE SELINUX
+  OS=$(cat /etc/redhat-release)
+  OS_ARCH=$(uname -i)
+  MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{printf "%.2f", $2/1024/1024}')
+  CPU_MODEL=$(grep 'model name' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1 | sed 's/^ *//g')
+  CPU_SOCKET_COUNT=$(grep 'physical id' /proc/cpuinfo | sort -u | wc -l)
+  CPU_CORE_COUNT=$(grep 'cpu cores' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
+  CPU_COUNT=$(grep -c ^processor /proc/cpuinfo)
+
+  # Check Hyperthreading (If siblings is equal cpu_core*2, this server uses hyperthreading.)
+  CPU_SIBLINGS=$(grep 'siblings' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
+  HYPERTHREADING=0
+  if [ "${CPU_SIBLINGS}" -eq $((CPU_CORE_COUNT*2)) ]
+  then
+    HYPERTHREADING=1
+  fi
+
+  # Check VM using 'lscpu'. If there is not 'lscpu' (ex. RHEL 5.8) decide not VM.
+  LSCPU=$(which lscpu 2>/dev/null)
+  if [ -n "${LSCPU}" ]
+  then
+    MACHINE_TYPE=$(${LSCPU} | grep Hypervisor | awk -F":" '{print $2}' | tr -d ' ')
+  else
+    Print_log "This server does not have 'lscpu'."
+  fi
+
+  # If "${MACHINE_TYPE}" is null (No Hypervisor or No 'lscpu')
+  if [ -z "${MACHINE_TYPE}" ]
+  then
+    MACHINE_TYPE="BM"
+  fi
+  
+  # Selinux
+  SELINUX=$(/usr/sbin/sestatus | cut -d":" -f2 | tr -d " ")
+
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### OS Information"
+    echo "HOSTNAME:${HOSTNAME}"
+    echo "OS:${OS}"
+    echo "OS_ARCH:${OS_ARCH}"
+    echo "MEMORY_SIZE:${MEMORY_SIZE}"
+    echo "CPU_MODEL:${CPU_MODEL}"
+    echo "MACHINE_TYPE:${MACHINE_TYPE}"
+    echo "CPU_SOCKET_COUNT:${CPU_SOCKET_COUNT}"
+    echo "CPU_CORE_COUNT:${CPU_CORE_COUNT}"
+    echo "CPU_COUNT:${CPU_COUNT}"
+    echo "HYPERTHREADING:${HYPERTHREADING}"
+    echo "SELINUX:${SELINUX}"
+  } >> "${OUTPUT}" 2>&1
 }
 
 ### df -h
@@ -171,58 +227,6 @@ function OSnsswitch () {
     echo $recsep
     echo "### /etc/nsswitch.conf"
     grep ^hosts /etc/nsswitch.conf
-  } >> "${OUTPUT}" 2>&1
-}
-
-### OS Check
-function OScommon () {
-  local OS OS_ARCH MEMORY_SIZE CPU_MODEL CPU_SOCKET_COUNT CPU_CORE_COUNT CPU_COUNT
-  local CPU_SIBLINGS HYPERTHREADING LSCPU MACHINE_TYPE
-  OS=$(cat /etc/redhat-release)
-  OS_ARCH=$(uname -i)
-  MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{printf "%.2f", $2/1024/1024}')
-  CPU_MODEL=$(grep 'model name' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1 | sed 's/^ *//g')
-  CPU_SOCKET_COUNT=$(grep 'physical id' /proc/cpuinfo | sort -u | wc -l)
-  CPU_CORE_COUNT=$(grep 'cpu cores' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
-  CPU_COUNT=$(grep -c ^processor /proc/cpuinfo)
-
-  # Check Hyperthreading (If siblings is equal cpu_core*2, this server uses hyperthreading.)
-  CPU_SIBLINGS=$(grep 'siblings' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1)
-  HYPERTHREADING=0
-  if [ "${CPU_SIBLINGS}" -eq $((CPU_CORE_COUNT*2)) ]
-  then
-    HYPERTHREADING=1
-  fi
-
-  # Check VM using 'lscpu'. If there is not 'lscpu' (ex. RHEL 5.8) decide not VM.
-  LSCPU=$(which lscpu 2>/dev/null)
-  if [ -n "${LSCPU}" ]
-  then
-    MACHINE_TYPE=$(${LSCPU} | grep Hypervisor | awk -F":" '{print $2}' | tr -d ' ')
-  else
-    Print_log "This server does not have 'lscpu'."
-  fi
-
-  # If "${MACHINE_TYPE}" is null (No Hypervisor or No 'lscpu')
-  if [ -z "${MACHINE_TYPE}" ]
-  then
-    MACHINE_TYPE="BM"
-  fi
-
-  # Insert to output file
-  {
-    echo $recsep
-    echo "### OS Information"
-    echo "HOSTNAME:${HOSTNAME}"
-    echo "OS:${OS}"
-    echo "OS_ARCH:${OS_ARCH}"
-    echo "MEMORY_SIZE:${MEMORY_SIZE}"
-    echo "CPU_MODEL:${CPU_MODEL}"
-    echo "MACHINE_TYPE:${MACHINE_TYPE}"
-    echo "CPU_SOCKET_COUNT:${CPU_SOCKET_COUNT}"
-    echo "CPU_CORE_COUNT:${CPU_CORE_COUNT}"
-    echo "CPU_COUNT:${CPU_COUNT}"
-    echo "HYPERTHREADING:${HYPERTHREADING}"
   } >> "${OUTPUT}" 2>&1
 }
 
@@ -1684,7 +1688,7 @@ EOF
 
 ### Oracle Listener
 function ORAlistener {
-  local LISTENERs LISTENER_USER LISTENER_HOME LISTENER_NAME ORACLE_HOME
+  local LISTENERs LISTENER_USER LISTENER_NAME ORACLE_HOME
 
   # Insert to output file
   {
@@ -1731,43 +1735,30 @@ function ORApfile {
   fi
 }
 
-### Collect count of event
-function ORAevent_count {
-  local SQLevent_count
-  SQLevent_count="
-   col sample_time for a12
-   select to_char(SAMPLE_TIME,'yyyymmdd') ||':'|| count(*)
-     from dba_hist_active_sess_history
-    group by to_char(SAMPLE_TIME,'yyyymmdd')
-    order by 1;
+### Collect redo log files
+function ORAredo {
+  local SQLredo
+  SQLredo="
+   col member for a50
+   col status for a10
+   select b.thread#
+        , a.group#
+        , a.member
+        , b.bytes/1024/1024 MB
+        , b.status
+        , b.sequence#
+     from gv\$logfile a
+        , gv\$log b
+    where a.group#=b.group#
+    order by 1,2; 
    "
 
   # Insert to output file
   {
     echo $recsep
-    echo "# Oracle Event total count from ASH"
+    echo "### Oracle redo log files"
+    Cmd_sqlplus "${COLLECT_VAL}" "${SQLredo}"
   } >> "${OUTPUT}"
-  Cmd_sqlplus "${COMMON_VAL}" "${SQLevent_count}" >> "${OUTPUT}"
-}
-
-### Collect count of event
-function ORAevent_group {
-  local SQLevent_group
-  SQLevent_group="
-   select event ||':'|| count(*)
-     from dba_hist_active_sess_history
-    where sample_time > sysdate-1
-      and event is not null
-    group by event
-    order by 1;
-   "
-
-  # Insert to output file
-  {
-    echo $recsep
-    echo "### Oracle Event count from ASH"
-  } >> "${OUTPUT}"
-  Cmd_sqlplus "${COMMON_VAL}" "${SQLevent_group}"  >> "${OUTPUT}"
 }
 
 ### Collect redo switch count
@@ -1836,39 +1827,59 @@ order by to_char(first_time,'YYYY/MM/DD') desc;
   {
     echo $recsep
     echo "### Oracle redo log switch count"
+    Cmd_sqlplus "${COLLECT_VAL}" "${SQLredo_switch}"
   } >> "${OUTPUT}"
-  Cmd_sqlplus "${COLLECT_VAL}" "${SQLredo_switch}"  >> "${OUTPUT}"
 }
 
-### Collect dba_hist_active_history
-function ORAash () {
-  local SQLash
-  SQLash="
-col sample_time for a17
-col sql_id for a15
-col state for a10
-col session_state for a13
-col event for a40
-col sql_text for a60
-select  to_char(sample_time, 'YYYYMMDD HH24:MI:SS') sample_time
-       ,session_id SID
-       ,sql_id
-       ,session_state STATE
-       ,blocking_session BSID
-       ,event
-       ,(select sql_text from v\$sqlarea where sql_id = h.sql_id) sql_text
-from dba_hist_active_sess_history h
-where sample_time > sysdate-1
-  and event is not null
-order by sample_time;
-"
+### Collect count of event
+function ORAevent_count {
+  local SQLevent_count
+  SQLevent_count="
+   col sample_time for a12
+   select to_char(SAMPLE_TIME,'yyyymmdd') ||':'|| count(*)
+     from dba_hist_active_sess_history
+    group by to_char(SAMPLE_TIME,'yyyymmdd')
+    order by 1;
+   "
+
   # Insert to output file
   {
     echo $recsep
-    echo "### Oracle Active Session History"
+    echo "# Oracle Event count per day from ASH"
+    Cmd_sqlplus "${COMMON_VAL}" "${SQLevent_count}"
   } >> "${OUTPUT}"
-  
-  Cmd_sqlplus "${COLLECT_VAL}" "${SQLash}" >> "${OUTPUT}"
+}
+
+### Collect count of event
+function ORAevent_group {
+  local SQLevent_group
+  SQLevent_group="
+   col username for a12
+   col sql_id for a15
+   col program for a30
+   col machine for a15
+   col event for a40
+   select B.username
+        , A.sql_id
+        , A.program
+        , A.machine
+        , A.event
+        , count(*)
+     from dba_hist_active_sess_history A
+	    , dba_users B
+    where sample_time > sysdate-1
+      and event is not null
+      and A.user_id = B.user_id
+    group by B.username, A.sql_id, A.program, A.machine, A.event
+    order by count(*) desc;
+   "
+
+  # Insert to output file
+  {
+    echo $recsep
+    echo "### Oracle Event count from ASH"
+    Cmd_sqlplus "${COLLECT_VAL}" "${SQLevent_group}"
+  } >> "${OUTPUT}"
 }
 
 ### Oracle alert log
@@ -1884,7 +1895,7 @@ function ORAalert () {
     echo "### Oracle alert log (100 lines)"
     if [ -f "${ALERT_LOG}" ]
     then
-      /usr//bin/tail -100 "${ALERT_LOG}"
+      /usr/bin/tail -100 "${ALERT_LOG}"
     fi
   } >> "${OUTPUT}"
 }
@@ -2140,6 +2151,7 @@ function ASMlistdisks () {
 
 ### ASM systemctl
 function ASMsystemctl () {
+  local SERVICE
   # If 'systemctl' exists
   if [ -f /bin/systemctl ]
   then
@@ -2193,9 +2205,6 @@ function Print_log() {
 }
 
 # ========== Main ========== #
-# Initial .bash_profile
-source ~/.bash_profile
-
 # Create target directory
 if [ ! -d "${BINDIR}" ]
 then
@@ -2243,10 +2252,10 @@ do
   ORAetc
   ORAlistener
   ORApfile
+  ORAredo
+  ORAredo_switch
   ORAevent_count
   ORAevent_group
-  ORAredo_switch
-  ORAash
   ORAalert
   ORAparameter
   
@@ -2279,8 +2288,8 @@ then
     ASMconfigure
     ASMlistdisks
     ASMsystemctl
-	ASMalert
-	ASMparameter
+    ASMalert
+    ASMparameter
   fi
 fi
 
