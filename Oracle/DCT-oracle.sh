@@ -2,12 +2,14 @@
 ########################################################
 # Description : Data Collection Tool of Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.07.01 by ashurei
+# Last Update DATE : 2021.07.07 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
+# This script is only for Linux platform.
+
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.07.01.r03"
+SCRIPT_VER="2021.07.07.r02"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -1097,7 +1099,7 @@ function ORAcommon () {
   exit
 EOF
 
-  local isOSW OSWATCHER AUDIT_FILE_DEST AUDIT_FILE_COUNT
+  local isOSW OSWATCHER AUDIT_FILE_DEST AUDIT_FILE_COUNT SQLheadroom SCN MAXIMUM_SCN CURRENT_SCN HEADROOM
   # OS Watcher
   isOSW=$(ps aux | grep -v grep | grep -c OSW)
   if [ "${isOSW}" -ge 0 ]
@@ -1109,12 +1111,34 @@ EOF
 
   # Audit file
   AUDIT_FILE_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='audit_file_dest';")
-  AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST}" -maxdepth 1 -name "*.aud" | wc -l)
+  AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST}" -maxdepth 1 -type f -name "*.aud" | wc -l)
+  
+  # Headroom
+  SQLheadroom="
+   set numwidth 14
+   select maximum_scn ||':'|| current_scn ||':'||
+       trunc((maximum_scn - current_scn)/(16384*3600*24),1) headroom
+     from (select dbms_flashback.get_system_change_number current_scn,
+              ((((to_number(to_char(sysdate, 'YYYY'))-1988)*372)+
+                ((to_number(to_char(sysdate,'MM'))-1)*31)+
+                ((to_number(to_char(sysdate,'DD'))-1)))*86400+
+                 (to_number(to_char(sysdate,'HH24'))*3600)+
+                 (to_number(to_char(sysdate,'MI'))*60)+
+                  to_number(to_char(sysdate,'SS')))*16384 maximum_scn
+            from dual) scn_stat;
+   "
+  SCN=$(Cmd_sqlplus "${COMMON_VAL}" "${SQLheadroom}")
+  MAXIMUM_SCN=$(echo "${SCN}" | cut -d":" -f1)
+  CURRENT_SCN=$(echo "${SCN}" | cut -d":" -f2)
+  HEADROOM=$(echo "${SCN}" | cut -d":" -f3)
   
   # Insert to output file
   {
     echo "OSWATCHER:$OSWATCHER"
 	echo "AUDIT_FILE_COUNT:$AUDIT_FILE_COUNT"
+	echo "MAXIMUM_SCN:$MAXIMUM_SCN"
+	echo "CURRENT_SCN:$CURRENT_SCN"
+	echo "HEADROOM:$HEADROOM"
   } >> "${OUTPUT}"
 }
 
@@ -2260,9 +2284,14 @@ do
   OSntp
   OSnsswitch
   Check_version
-  Check_option_general
-  Check_option_ULA
-
+  
+  # Check ULA option when Oracle version is above 11g.
+  if [ "${ORACLE_MAJOR_VERSION}" -ge "11" ]
+  then
+    Check_option_general
+    Check_option_ULA
+  fi
+  
   ORAcommon
   ORAosuser
   ORApatch
