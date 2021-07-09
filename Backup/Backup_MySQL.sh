@@ -2,7 +2,7 @@
 #################################################
 # Description : MySQL/MariaDB mysqldump
 # Create DATE : 2020.03.11
-# Last Update DATE : 2020.08.27 by ashurei
+# Last Update DATE : 2021.07.09 by ashurei
 # Copyright (c) Technical Solution, 2020
 #################################################
 
@@ -38,7 +38,7 @@ then
 # Find with 'which'
 elif [ "$(which mysql 2>/dev/null)" ]
 then
-        MYSQL_DIR=$(which mysql)
+        MYSQL_DIR=$(which mysql | awk -F'/bin' '{print $1"/bin"}')
 else
         echo "[${DATE}] (ERROR) Not setted MySQL execute path." | tee -a "${BACKLOG}"
         exit 1
