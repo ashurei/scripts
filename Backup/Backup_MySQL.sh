@@ -36,7 +36,7 @@ elif [ -f "/usr/local/mysql/bin/mysql" ]
 then
         MYSQL_DIR="/usr/local/mysql/bin"
 # Find with 'which'
-elif [ "$(which mysql 2>dev/null)" ]
+elif [ "$(which mysql 2>/dev/null)" ]
 then
         MYSQL_DIR=$(which mysql)
 else
