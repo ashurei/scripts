@@ -2,14 +2,14 @@
 ########################################################
 # Description : Data Collection Tool of Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.07.07 by ashurei
+# Last Update DATE : 2021.07.15 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
-# This script is only for Linux platform.
+# This script can only be used on linux platform.
 
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.07.07.r02"
+SCRIPT_VER="2021.07.15.r09"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -23,9 +23,18 @@ COLLECT_VAL="set line 200 pages 10000 feedback off verify off echo off"
 # ========== Functions ========== #
 ### Get Oracle environment variable
 function Get_oracle_env() {
+  local thisUSER_LENGTH thisUSER
+  # If user length is greater than 8, change '+' (ex. oraSPAMDB => oraSPAM+)
+  thisUSER_LENGTH=$(whoami | awk '{print length}')
+  thisUSER=$(whoami)
+  if [ "${thisUSER_LENGTH}" -gt 8 ]
+  then
+    thisUSER="${thisUSER:0:7}+"
+  fi
+
   # If there is one more ora_pmon process, get only one because this script is for license check.
-  ORACLE_USER=$(ps aux | grep ora_pmon | grep "$(whoami)" | grep -v grep | head -1 | awk '{print $1}')
-  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep "$(whoami)" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+  ORACLE_USER=$(ps aux | grep ora_pmon | grep -w "${thisUSER}" | grep -v grep | head -1 | awk '{print $1}')
+  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep -w "${thisUSER}" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
 
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
@@ -90,7 +99,7 @@ function Create_output () {
 ### OS Check
 function OScommon () {
   local OS OS_ARCH MEMORY_SIZE CPU_MODEL CPU_SOCKET_COUNT CPU_CORE_COUNT CPU_COUNT
-  local CPU_SIBLINGS HYPERTHREADING LSCPU MACHINE_TYPE SELINUX
+  local CPU_SIBLINGS HYPERTHREADING LSCPU MACHINE_TYPE SELINUX UPTIME
   OS=$(cat /etc/redhat-release)
   OS_ARCH=$(uname -i)
   MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{printf "%.2f", $2/1024/1024}')
@@ -123,7 +132,10 @@ function OScommon () {
   fi
   
   # Selinux
-  SELINUX=$(/usr/sbin/sestatus | cut -d":" -f2 | tr -d " ")
+  SELINUX=$(/usr/sbin/getenforce)
+  
+  # Uptime (days)
+  UPTIME=$(uptime | cut -d" " -f4)
 
   # Insert to output file
   {
@@ -140,6 +152,7 @@ function OScommon () {
     echo "CPU_COUNT:${CPU_COUNT}"
     echo "HYPERTHREADING:${HYPERTHREADING}"
     echo "SELINUX:${SELINUX}"
+	echo "UPTIME:${UPTIME}"
   } >> "${OUTPUT}" 2>&1
 }
 
@@ -211,14 +224,23 @@ function OSrpm () {
 
 ### NTP
 function OSntp () {
+  local isNTP
+  isNTP=$(/bin/rpm -q ntp | grep "not installed")
+
   # Insert to output file
   {
     echo $recsep
     echo "### NTP"
-    echo "# ntpq -p"
-    /usr/sbin/ntpq -p
-    echo "# /etc/sysconfig/ntpd.conf"
-    grep -v "^#" /etc/sysconfig/ntpd
+    # If NTP is not installed ($isNTP is not null)
+    if [ -n "${isNTP}" ]
+    then
+      echo "NTP is not installed."
+    else
+      echo "# ntpq -p"
+      /usr/sbin/ntpq -p
+      echo "# /etc/sysconfig/ntpd.conf"
+      grep -v "^#" /etc/sysconfig/ntpd
+    fi
   } >> "${OUTPUT}" 2>&1
 }
 
@@ -241,9 +263,22 @@ exit
 EOF
 }
 
+### Check sqlplus
+function Check_sqlplus() {
+  local SQLcheck_sqlplus chkSQLPLUS
+  SQLcheck_sqlplus=$(Cmd_sqlplus "${COMMON_VAL}" "select 1 from dual;")
+  chkSQLPLUS=$(echo "${SQLcheck_sqlplus}" | grep -c "ORA-01017")
+  if [ "${chkSQLPLUS}" -ge 1 ]
+  then
+    Print_log "[ERROR] Cannot connect 'sqlplus / as sysdba'. Check sqlnet.ora."
+	exit 1
+  fi
+}
+
 ### Check Oracle version
 function Check_version() {
   ORACLE_VERSION=$(Cmd_sqlplus "${COMMON_VAL}" "select version from v\$instance;")
+  ORACLE_VERSION_NUM=$(echo "${ORACLE_VERSION}" | tr -d ".")
   ORACLE_MAJOR_VERSION=$(echo "${ORACLE_VERSION}" | cut -d"." -f1)
 
   number='[0-9]'
@@ -1288,21 +1323,37 @@ EOF
 
 ### Oracle jobs
 function ORAjob () {
-  local SQLautotask SQLocm SQLawr_snap_interval_min SQLawr_snap_last_time SQLawr_retention_day 
+  local isAUTOTASK AUTOTASK SQLautotask_client SQLocm SQLawr_snap_interval_min SQLawr_snap_last_time SQLawr_retention_day 
   local SQLscheduler_jobs SQLjobs SQLfailed_job
   
-  SQLautotask="
-   select case when client_name='auto space advisor' then 'AUTO_SPACE_ADVISOR'
-               when client_name='auto optimizer stats collection' then 'AUTO_OPTIMIZER_STATS_COLLECTION'
-               when client_name='sql tuning advisor'then 'SQL_TUNING_ADVISOR'
-          end || ':' || status
-     from dba_autotask_client
-    where client_name in ('auto space advisor','auto optimizer stats collection','sql tuning advisor');
-   "
+  # Beyond 11.2
+  if [ "${ORACLE_VERSION_NUM}" -ge "112000" ]
+  then
+    #SQLautotask="select 'AUTOTASK:' || status from dba_autotask_status;"
+    ORACLE_VERSION=$(Cmd_sqlplus "${COMMON_VAL}" "select version from v\$instance;")
+    isAUTOTASK=$(Cmd_sqlplus "${COMMON_VAL}" \
+                             "select count(*) from dba_autotask_window_clients where autotask_status='ENABLED';")
+    # Count of autotask_status ENABLED in dba_autotask_window_clients > 0
+    AUTOTASK="DISABLED" 
+    if [ "${isAUTOTASK}" -gt 0 ]
+    then
+      AUTOTASK="ENABLED"
+    fi
+  
+    SQLautotask_client="
+     select case when client_name='auto space advisor' then 'AUTO_SPACE_ADVISOR'
+                 when client_name='auto optimizer stats collection' then 'AUTO_OPTIMIZER_STATS_COLLECTION'
+                 when client_name='sql tuning advisor'then 'SQL_TUNING_ADVISOR'
+            end || ':' || status
+       from dba_autotask_client
+      where client_name in ('auto space advisor','auto optimizer stats collection','sql tuning advisor');
+     "
+  fi
+  
   SQLocm="select job_name || ':' || enabled from dba_scheduler_jobs where owner='ORACLE_OCM';"
 
   SQLawr_snap_interval_min="select 'AWR_SNAP_INTERVAL_MIN:'||(60*extract(hour from SNAP_INTERVAL)+extract(minute from SNAP_INTERVAL)) from dba_hist_wr_control;"
-  SQLawr_snap_last_time="select 'AWR_SNAP_LAST_TIME:'||max(to_char(end_interval_time,'YYYYMMDD')) from dba_hist_snapshot;"
+  SQLawr_snap_last_time="select 'AWR_SNAP_LAST_TIME:'||max(to_char(end_interval_time,'YYYYMMDD-HH24MISS')) from dba_hist_snapshot;"
   SQLawr_retention_day="select 'AWR_RETENTION_DAY:'||extract(day from retention) from dba_hist_wr_control;"
   
   ### dba_scheduler_jobs in failure count
@@ -1332,12 +1383,13 @@ function ORAjob () {
   {
     echo $recsep
     echo "### Oracle job"
+    echo "# autotask"
+    echo "AUTOTASK:$AUTOTASK"
   } >> "${OUTPUT}"
   
   sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
   $COMMON_VAL
-  prompt # autotask
-  $SQLautotask
+  $SQLautotask_client
   $SQLocm
   prompt # AWR
   $SQLawr_snap_interval_min
@@ -1631,13 +1683,16 @@ function ORAetc () {
       and rownum < 100;
    "
 
-        #if [ $DB_VERSION_i -ge 112000 ]
-  SQLresult_cache_object="
-   select rtrim(type) ||':'|| rtrim(status) ||':'|| count(*)
-         from v\$result_cache_objects
-        group by type, status;
-   "
-        #fi
+  ## Above 11g
+  if [ "${ORACLE_VERSION_NUM}" -ge "112000" ]
+  then
+    SQLresult_cache_object="
+     select rtrim(type) ||':'|| rtrim(status) ||':'|| count(*)
+           from v\$result_cache_objects
+          group by type, status;
+     "
+  fi
+  
   SQLpublic_db_link="select rtrim(owner) ||':'|| rtrim(db_link) from dba_db_links where owner='PUBLIC';"
   SQLdb_link="select rtrim(owner) ||':'|| rtrim(db_link) from dba_db_links order by owner;"     # SYS:SYS_HUB
   SQL2pc_pending="select rtrim(local_tran_id) ||':'|| rtrim(global_tran_id) ||':'|| to_char(fail_time,'YYYYMMDDHH24MISS') ||':'|| rtrim(state) ||':'|| mixed from dba_2pc_pending;"
@@ -1666,7 +1721,7 @@ function ORAetc () {
    select rtrim(ksmssnam) ||':'|| rtrim(ksmdsidx) ||':'|| rtrim(round(ksmsslen/1024/1024))
      from x\$ksmss
     where ksmsslen/1024/1024 > 100
-          and ksmssnam not in ('free memory','SQLA')
+      and ksmssnam not in ('free memory','SQLA')
     order by ksmsslen;
    "
   
@@ -1902,7 +1957,7 @@ function ORAash {
    col sql_id for a15
    col program for a30
    col machine for a15
-   col event for a40
+   col event for a50
    select B.username
         , A.sql_id
         , A.program
@@ -1965,7 +2020,7 @@ function CRScommon () {
   MISSCOUNT=$("${CRSCTL}" get css misscount | grep misscount | awk '{print $5}')
   DISKTIMEOUT=$("${CRSCTL}" get css disktimeout | grep disktimeout | awk '{print $5}')
   AUTOSTART=$(cat /etc/oracle/scls_scr/"${HOSTNAME}"/root/crsstart)
-  CLIENT_LOG_COUNT=$(find "${GRID_HOME}"/log/eg-rac01/client -maxdepth 1 -name "*.log" | wc -l)
+  CLIENT_LOG_COUNT=$(find "${GRID_HOME}"/log/"${HOSTNAME}"/client -maxdepth 1 -name "*.log" | wc -l)
   
   isCHM=$(ps aux | grep -v grep | grep -c osysmond.bin)
   if [ "${isCHM}" -gt 0 ]
@@ -2244,6 +2299,14 @@ function Print_log() {
   local LOG LOGDATE COLLECT_YEAR
   COLLECT_YEAR=$(date '+%Y')
   LOG="${BINDIR}/DCT_${HOSTNAME}_${COLLECT_YEAR}.log"
+  
+  # Create file with '664' permission for Oracle users.
+  if [ ! -f "${LOG}" ]
+  then
+    /bin/touch "${LOG}"
+	chmod 664 "${LOG}"
+  fi
+  
   LOGDATE="[$(date '+%Y%m%d-%H:%M:%S')]"
   echo "${LOGDATE} $1" >> "${LOG}"
 }
@@ -2253,14 +2316,13 @@ function Print_log() {
 if [ ! -d "${BINDIR}" ]
 then
   set -e
-  mkdir -p "${BINDIR}"
+  mkdir "${BINDIR}" -m 0775
   set +e
 fi
 
-Print_log "Start collect"
-
 # Get Oracle environment data
 Get_oracle_env
+Print_log "(${ORACLE_USER}) Start collect"
 
 ### Oracle Database
 for ORACLE_SID in ${ORACLE_SIDs}
@@ -2283,6 +2345,8 @@ do
   OSrpm
   OSntp
   OSnsswitch
+  
+  Check_sqlplus
   Check_version
   
   # Check ULA option when Oracle version is above 11g.
@@ -2343,6 +2407,9 @@ then
   fi
 fi
 
-/bin/rm ${RESULT}
+if [ -f "${RESULT}" ]
+then
+  /bin/rm ${RESULT}
+fi
 
-Print_log "End collect"
+Print_log "(${ORACLE_USER}) End collect"
