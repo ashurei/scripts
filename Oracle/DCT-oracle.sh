@@ -2,14 +2,14 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.07.16 by ashurei
+# Last Update DATE : 2021.07.19 by ashurei
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
 # This script can only be used on linux platform.
 
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.07.16.r09"
+SCRIPT_VER="2021.07.19.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -34,8 +34,8 @@ function Get_oracle_env() {
   fi
 
   # If there is one more ora_pmon process, get only one because this script is for license check.
-  ORACLE_USER=$(ps aux | grep ora_pmon | grep -w "${thisUSER}" | grep -v grep | head -1 | awk '{print $1}')
-  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep -w "${thisUSER}" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+  ORACLE_USER=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | head -1 | awk '{print $1}')
+  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
 
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
@@ -2419,7 +2419,7 @@ do
     CRSresource
     CRSoifcfg
     CRScssd
-    if [ "${isASM}" -ge 0 ]
+    if [ "${isASM}" -gt 0 ]
     then
       ASM_SID=$(ps aux | grep asm_pmon | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
 	  
