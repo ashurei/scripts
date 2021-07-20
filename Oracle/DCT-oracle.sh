@@ -2,14 +2,16 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.07.19 by ashurei
-# Copyright (c) Technical Solution, 2021
+# Last Update DATE : 2021.07.20 by ashurei
+# Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
-# This script can only be used on linux platform.
+# This script can only be used on Linux platform.
+# This script was created to be run by the Oracle user. 
 
+set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.07.19.r01"
+SCRIPT_VER="2021.07.20.r02"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -244,8 +246,8 @@ function OSntp () {
     then
       echo "NTP is not installed."
     else
-      echo "# ntpq -p"
-      /usr/sbin/ntpq -p
+      echo "# ntpq -pn"
+      /usr/sbin/ntpq -pn
       echo "# /etc/sysconfig/ntpd.conf"
       grep -Ev '^#|^\s*$' /etc/sysconfig/ntpd
     fi
