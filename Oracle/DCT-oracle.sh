@@ -11,7 +11,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.07.27.r01"
+SCRIPT_VER="2021.08.10.r02"
 
 # Get environment from Oracle user for crontab.
 source ~/.bash_profile
@@ -1993,6 +1993,78 @@ function ORAash {
   } >> "${OUTPUT}" 2>&1
 }
 
+### Oracle Datafiles
+function ORAfile () {
+  local SQLdatafile SQLtempfile SQLtotal_free SQLtemp_free
+  SQLdatafile="
+   col file_name for a60
+   col tablespace_name for a20
+   select file_id, file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_data_files order by file_name;
+   "
+  
+  SQLtempfile="
+   col file_name for a60
+   col tablespace_name for a20
+   select file_id, file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_temp_files;
+  "
+  
+  SQLtotal_free="
+   column tn   format a20            heading 'TableSpace|Name'
+   column Tot  format 999,999,999.99 heading 'Total|(Mb)'
+   column Free format 999,999,999.99 heading 'Free|(Mb)'
+   column Used format 999,999,999.99 heading 'Used|(Mb)'
+   column Pct  format 999,999,999.99 heading 'Pct|(%)'
+   SELECT  t.tn,
+           t.sizes Tot,
+           (t.sizes - f.sizes ) Used,
+           (t.sizes - f.sizes) /t.sizes * 100 Pct,
+           f.sizes Free
+   FROM    ( SELECT tablespace_name tn,
+                    sum(bytes)/1024/1024 Sizes
+             FROM   dba_data_files
+             GROUP  BY tablespace_name) t,
+           ( SELECT tablespace_name tn,
+                    sum(bytes)/1024/1024 sizes
+             FROM   dba_free_space
+             GROUP BY tablespace_name) f
+   WHERE t.tn = f.tn
+   ORDER BY Pct desc;
+  "
+  
+  SQLtemp_free="
+   col tablespace_name for a20
+   col total_m for	999,999,999.99 heading 'TOTAL (MB)'
+   col free_m for	999,999,999.99 heading 'FREE (MB)'
+   col pct_used for	999,999,999.99 heading 'PCT (%)'
+   select a.tablespace_name, a.total_M, b.free_M, round((b.used_M/a.total_M)*100,2) pct_used
+   from ( select tablespace_name, sum(bytes/1024/1024) total_M from dba_temp_files
+    group by tablespace_name ) a,
+    ( select tablespace_name, sum(bytes_free/1024/1024) free_M, sum(bytes_used/1024/1024) used_M
+      from v\$temp_space_header
+      group by tablespace_name ) b
+   where a.tablespace_name = b.tablespace_name;
+  "
+  
+  # Insert to output file
+  {
+    echo $recsep
+    echo "##@ ORAfile"
+  } >> "${OUTPUT}" 2>&1
+  
+  sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
+  $COLLECT_VAL
+  prompt # Datafiles
+  $SQLdatafile
+  prompt # Tempfiles
+  $SQLtempfile
+  prompt # Total free
+  $SQLtotal_free
+  prompt # Temp free
+  $SQLtemp_free
+  exit
+EOF
+}
+
 ### Oracle alert log (100 lines)
 function ORAalert () {
   local DIAG_DEST ALERT_LOG
@@ -2402,6 +2474,7 @@ do
   ORAevent_count
   ORAevent_group
   ORAash
+  ORAfile
   ORAalert
   ORAparameter
   
