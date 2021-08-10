@@ -11,7 +11,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.08.10.r02"
+SCRIPT_VER="2021.08.10.r03"
 
 # Get environment from Oracle user for crontab.
 source ~/.bash_profile
@@ -148,8 +148,7 @@ function OScommon () {
   # Uptime (days)
   UPTIME=$(uptime | cut -d" " -f4)
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OScommon"
     echo "HOSTNAME:${HOSTNAME}"
@@ -169,8 +168,7 @@ function OScommon () {
 
 ### df -h
 function OSdf () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OSdf"
     /bin/df -h
@@ -179,8 +177,7 @@ function OSdf () {
 
 ### /etc/hosts
 function OShosts () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OShosts"
     echo "# /etc/hosts"
@@ -190,8 +187,7 @@ function OShosts () {
 
 ### /proc/meminfo
 function OSmeminfo () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OSmeminfo"
     echo "# /proc/meminfo"
@@ -203,8 +199,7 @@ function OSmeminfo () {
 
 ### /etc/security/limits.conf
 function OSlimits () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OSlimits"
 	echo "# /etc/security/limits.conf"
@@ -216,8 +211,7 @@ function OSlimits () {
 
 ### Kernel parameter
 function OSkernel_parameter () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OSkernel_parameter"
     /sbin/sysctl -a 2>/dev/null
@@ -227,8 +221,7 @@ function OSkernel_parameter () {
 
 ### RPM
 function OSrpm () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OSrpm"
     /bin/rpm -qa
@@ -240,8 +233,7 @@ function OSntp () {
   local isNTP
   isNTP=$(/bin/rpm -q ntp | grep "not installed")
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OSntp"
     # If NTP is not installed ($isNTP is not null)
@@ -259,8 +251,7 @@ function OSntp () {
 
 ### nsswitch.conf
 function OSnsswitch () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ OSnsswitch"
 	echo "# /etc/nsswitch.conf"
@@ -408,8 +399,7 @@ function ORAoption_general () {
 
   Set_general_var
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAoption_general"
     #echo "HOST_NAME:$HOST_NAME"
@@ -993,8 +983,7 @@ function ORAoption_ULA () {
 
   Set_option_var
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAoption_ULA"
     echo "DATABASE_GATEWAY:${DATABASE_GATEWAY}"
@@ -1117,8 +1106,7 @@ function ORAcommon () {
 	  and COMPLETION_TIME > sysdate -7;
    "
    
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAcommon"
   } >> "${OUTPUT}"
@@ -1181,8 +1169,7 @@ EOF
   CURRENT_SCN=$(echo "${SCN}" | cut -d":" -f2)
   HEADROOM=$(echo "${SCN}" | cut -d":" -f3)
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo "OSWATCHER:$OSWATCHER"
 	echo "AUDIT_FILE_COUNT:$AUDIT_FILE_COUNT"
 	echo "MAXIMUM_SCN:$MAXIMUM_SCN"
@@ -1195,7 +1182,6 @@ EOF
 ### Oracle user resource limit
 function ORAosuser () {
   local uid gid ushell ulimit_n ulimit_u ulimit_s ulimit_l
-  
   uid=$(grep "${WHOAMI}": /etc/passwd | awk -F":" '{print $3}')
   gid=$(grep "${WHOAMI}": /etc/passwd | awk -F":" '{print $4}')
   ushell=$(grep "${WHOAMI}": /etc/passwd | awk -F":" '{print $NF}')
@@ -1204,8 +1190,7 @@ function ORAosuser () {
   ulimit_s=$(ulimit -s) # stack
   ulimit_l=$(ulimit -l) # memlock
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAosuser"
     echo "uid:$uid"
@@ -1220,8 +1205,7 @@ function ORAosuser () {
 
 ### Oracle Database Patch
 function ORApatch () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORApatch"
     "${ORACLE_HOME}/OPatch/opatch" lsinventory -oh "${ORACLE_HOME}"
@@ -1231,7 +1215,6 @@ function ORApatch () {
 ### Oracle Privileges
 function ORAprivilege () {
   local SQLrole_privs SQLsys_privs SQLprofile
-  
   SQLrole_privs="  
    select grantee ||':'|| granted_role
     from dba_role_privs
@@ -1318,8 +1301,7 @@ function ORAprivilege () {
     order by profile, resource_name;
    "
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAprivilege"
   } >> "${OUTPUT}" 2>&1
@@ -1391,8 +1373,7 @@ function ORAjob () {
     where failures > 0;
    "
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAjob"
     echo "# autotask"
@@ -1606,8 +1587,7 @@ function ORAcapacity () {
 	  and (value is NULL or value = 'FORCE:');
    "
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAcapacity"
   } >> "${OUTPUT}" 2>&1
@@ -1737,8 +1717,7 @@ function ORAetc () {
     order by ksmsslen;
    "
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAetc"
   } >> "${OUTPUT}" 2>&1
@@ -1781,8 +1760,7 @@ EOF
 function ORAlistener {
   local LISTENERs LISTENER_USER LISTENER_NAME ORACLE_HOME
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAlistener"
     # (USER):(BINARY_PATH):(LISTENER_NAME)
@@ -1807,8 +1785,7 @@ function ORApfile {
   SQLcreate_pfile="create pfile='${RESULT}' from spfile;"
   SPFILE=$(Cmd_sqlplus "${COMMON_VAL}" "${SQLspfile}")
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORApfile"
     echo "SPFILE:$SPFILE"
@@ -1844,8 +1821,7 @@ function ORAredo {
     order by 1,2; 
    "
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAredo"
     Cmd_sqlplus "${COLLECT_VAL}" "${SQLredo}"
@@ -1914,8 +1890,7 @@ group by to_char(first_time,'YYYY/MM/DD')
 order by to_char(first_time,'YYYY/MM/DD') desc;
 "
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAredo_switch"
     Cmd_sqlplus "${COLLECT_VAL}" "${SQLredo_switch}"
@@ -1933,8 +1908,7 @@ function ORAevent_count {
     order by 1;
    "
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "# ORAevent_count"
     Cmd_sqlplus "${COMMON_VAL}" "${SQLevent_count}"
@@ -1953,8 +1927,7 @@ function ORAevent_group {
     order by count(*) desc;
    "
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAevent_group"
     Cmd_sqlplus "${COMMON_VAL}" "${SQLevent_group}"
@@ -1985,8 +1958,7 @@ function ORAash {
     order by count(*) desc;
    "
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAash"
     Cmd_sqlplus "${COLLECT_VAL}" "${SQLash}"
@@ -2001,13 +1973,11 @@ function ORAfile () {
    col tablespace_name for a20
    select file_id, file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_data_files order by file_name;
    "
-  
   SQLtempfile="
    col file_name for a60
    col tablespace_name for a20
    select file_id, file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_temp_files;
   "
-  
   SQLtotal_free="
    column tn   format a20            heading 'TableSpace|Name'
    column Tot  format 999,999,999.99 heading 'Total|(Mb)'
@@ -2030,7 +2000,6 @@ function ORAfile () {
    WHERE t.tn = f.tn
    ORDER BY Pct desc;
   "
-  
   SQLtemp_free="
    col tablespace_name for a20
    col total_m for	999,999,999.99 heading 'TOTAL (MB)'
@@ -2045,8 +2014,7 @@ function ORAfile () {
    where a.tablespace_name = b.tablespace_name;
   "
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAfile"
   } >> "${OUTPUT}" 2>&1
@@ -2072,8 +2040,7 @@ function ORAalert () {
   DATABASE_NAME=$(Cmd_sqlplus "${COMMON_VAL}" "select name from v\$database;" | tr '[:upper:]' '[:lower:]')
   ALERT_LOG="${DIAG_DEST}/diag/rdbms/${DATABASE_NAME}/${ORACLE_SID}/trace/alert_${ORACLE_SID}.log"
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAalert"
     if [ -f "${ALERT_LOG}" ]
@@ -2088,8 +2055,7 @@ function ORAparameter () {
   local SQLparameter
   SQLparameter="select ksppinm||' '||ksppstvl from x\$ksppi a, x\$ksppsv b where a.indx=b.indx order by ksppinm;"
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ORAparameter"
 	Cmd_sqlplus "${COMMON_VAL}" "${SQLparameter}"
@@ -2100,7 +2066,6 @@ function ORAparameter () {
 function CRScommon () {
   local MISSCOUNT DISKTIMEOUT AUTOSTART CLIENT_LOG_COUNT isCHM CHM 
   local CLUSTER_STATUS CLUSTER_NAME CLUSTER_NODENAME CLUSTER_NODES
-  
   MISSCOUNT=$("${CRSCTL}" get css misscount | grep misscount | awk '{print $5}')
   DISKTIMEOUT=$("${CRSCTL}" get css disktimeout | grep disktimeout | awk '{print $5}')
   AUTOSTART=$(cat /etc/oracle/scls_scr/"${HOSTNAME}"/root/crsstart)
@@ -2120,8 +2085,7 @@ function CRScommon () {
   CLUSTER_NODENAME=$("${GRID_HOME}"/bin/olsnodes -l)
   CLUSTER_NODES=$("${GRID_HOME}"/bin/olsnodes | tr "\n" "," | sed 's/.$//')
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRScommon"
     echo "MISSCOUNT:$MISSCOUNT"
@@ -2140,13 +2104,11 @@ function CRScommon () {
 ### Grid user resource limit
 function CRSosuser () {
   local uid gid ushell
-  
   uid=$(grep "${GRID_USER}" /etc/passwd | awk -F":" '{print $3}')
   gid=$(grep "${GRID_USER}" /etc/passwd | awk -F":" '{print $4}')
   ushell=$(grep "${GRID_USER}" /etc/passwd | awk -F":" '{print $NF}')
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRSosuser"
     echo "uid:$uid"
@@ -2157,8 +2119,7 @@ function CRSosuser () {
 
 ### Grid Patch
 function CRSpatch () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRSpatch"
     "${GRID_HOME}/OPatch/opatch" lsinventory
@@ -2167,8 +2128,7 @@ function CRSpatch () {
 
 ### crsctl status resource -t
 function CRSstatRes () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRSstatRes"
     "${CRSCTL}" status resource -t
@@ -2177,8 +2137,7 @@ function CRSstatRes () {
 
 ### crsctl status resource -t -init
 function CRSstatResInit () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRSstatResInit"
     "${CRSCTL}" status resource -t -init
@@ -2193,8 +2152,7 @@ function CRSvote () {
   VOTEDISK_PERMISSION=$("${CRSCTL}" query css votedisk | grep "\[" | awk '{print $4" "$5}' \
                       | sed 's/[()]//g' | awk '{system("ls -l "$1)}')
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRSvote"
     echo "${VOTEINFO}"
@@ -2208,8 +2166,7 @@ function CRSocr () { # ocrbackup, olrbackup
   OCRBACKUP=$("${GRID_HOME}"/bin/ocrconfig -showbackup | grep ocr)
   OLRBACKUP=$("${GRID_HOME}"/bin/ocrconfig -local -showbackup | grep olr)
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRSocr"
     echo "OCRLOC:${OCRLOC}"
@@ -2260,8 +2217,7 @@ function CRSoifcfg () {
   local INTERCONNECT
   INTERCONNECT=$("${GRID_HOME}"/bin/oifcfg getif | grep cluster_interconnect | awk '{print $1}')
   
-  # Insert to output
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRSoifcfg"
   } >> "${OUTPUT}" 2>&1
@@ -2275,8 +2231,7 @@ function CRSoifcfg () {
 
 ### Grid cssd
 function CRScssd () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ CRScssd"
     echo "# ora.cssd"
@@ -2297,8 +2252,7 @@ function ASMcommon () {
   AUDIT_FILE_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='audit_file_dest';")
   AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST}" -maxdepth 1 -name "*.aud" | wc -l)
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ASMcommon"
     echo "ASM_SID:$ORACLE_SID"
@@ -2312,8 +2266,7 @@ function ASMlsdg () {
   ORACLE_HOME=$1
   ORACLE_SID=$2
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ASMlsdg"
     "${GRID_HOME}"/bin/asmcmd lsdg
@@ -2322,8 +2275,7 @@ function ASMlsdg () {
 
 ### ASM configure
 function ASMconfigure () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ASMconfigure"
     /usr/sbin/oracleasm configure
@@ -2332,8 +2284,7 @@ function ASMconfigure () {
 
 ### ASM listdisks
 function ASMlistdisks () {
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ASMlistdisks"
     /usr/sbin/oracleasm listdisks | xargs oracleasm querydisk -p 
@@ -2344,8 +2295,7 @@ function ASMlistdisks () {
 function ASMsystemctl () {
   local SERVICE
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ASMsystemctl"
    
@@ -2370,8 +2320,7 @@ function ASMalert () {
   DIAG_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='diagnostic_dest';")
   ALERT_LOG="${DIAG_DEST}/diag/asm/+asm/${ORACLE_SID}/trace/alert_${ORACLE_SID}.log"
   
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ASMalert"
     if [ -f "${ALERT_LOG}" ]
@@ -2390,8 +2339,7 @@ function ASMparameter () {
   local SQLparameter
   SQLparameter="select ksppinm||' '||ksppstvl from x\$ksppi a, x\$ksppsv b where a.indx=b.indx order by ksppinm;"
 
-  # Insert to output file
-  {
+  { # Insert to output file
     echo $recsep
     echo "##@ ASMparameter"
 	Cmd_sqlplus "${COMMON_VAL}" "${SQLparameter}"
