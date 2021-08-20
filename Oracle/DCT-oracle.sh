@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.07.27 by ashurei
+# Last Update DATE : 2021.08.19 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -11,10 +11,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.08.10.r03"
-
-# Get environment from Oracle user for crontab.
-source ~/.bash_profile
+SCRIPT_VER="2021.08.19.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -29,7 +26,7 @@ COLLECT_VAL="set line 200 pages 10000 feedback off verify off echo off"
 # ========== Functions ========== #
 ### Get Oracle environment variable
 function Get_oracle_env() {
-  local thisUSER_LENGTH thisUSER
+  local thisUSER_LENGTH thisUSER SHELL
   # If user length is greater than 8, change '+' (ex. oraSPAMDB => oraSPAM+)
   thisUSER_LENGTH="${#WHOAMI}"
   thisUSER="${WHOAMI}"
@@ -41,6 +38,15 @@ function Get_oracle_env() {
   # If there is one more ora_pmon process, get only one because this script is for license check.
   ORACLE_USER=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | head -1 | awk '{print $1}')
   ORACLE_SIDs=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+
+  # Get environment from Oracle user for crontab.
+  SHELL=$(grep -w ^"${WHOAMI}" /etc/passwd | awk -F":" '{print $NF}')
+  if [ "${SHELL}" == "/bin/bash" ]
+  then
+    source ~/.bash_profile
+  else
+    source ~/.profile
+  fi
 
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
@@ -59,15 +65,14 @@ function Get_oracle_env() {
   
   # Check CRS environment
   GRID_USER=$(ps aux | grep ocssd.bin | grep -v grep | awk '{print $1}')
-  # If user length is equal 8, remove '+' (ex. gridSPA+ => gridSPA)
-  if [ "${#GRID_USER}" -eq 8 ]
-  then
-    GRID_USER="${GRID_USER:0:-1}"
-  fi
-  
   # If $GRID_USER is exist
   if [ -n "${GRID_USER}" ]
   then
+    # If user length is equal 8, remove '+' (ex. gridSPA+ => gridSPA)
+    if [ "${#GRID_USER}" -eq 8 ]
+    then
+      GRID_USER="${GRID_USER:0:-1}"
+    fi
     GRID_HOME=$(ps aux | grep crsd.bin | grep -v grep | awk -F"/bin/crsd.bin" '{print $1}' | grep -v awk | awk '{print $NF}')
     CRSCTL="${GRID_HOME}/bin/crsctl"
     SRVCTL="${GRID_HOME}/bin/srvctl"
@@ -994,12 +999,12 @@ function ORAoption_ULA () {
     echo "ADG:${ADG}"
     echo "ADG_RAC:${ADG}"
     echo "ADVANCED_ANALYTICS:${AA}"
-    echo "ADVANCED_COMPRESIION:${AC}"
+    echo "ADVANCED_COMPRESSION:${AC}"
     echo "ADVANCED_SECURITY:${AS}"
     echo "DATABASE_INMEMORY:${DIM}"
     echo "DATABASE_VAULT:${DV}"
     echo "DIAGNOSTICS_PACK:${DP}"
-    echo "LABEL_SECURIRY:${LS}"
+    echo "LABEL_SECURITY:${LS}"
     echo "MULTITENANT:${MT}"
     echo "OLAP:${OLAP}"
     echo "PARTITION:${PARTITION}"
@@ -2068,8 +2073,8 @@ function CRScommon () {
   local CLUSTER_STATUS CLUSTER_NAME CLUSTER_NODENAME CLUSTER_NODES
   MISSCOUNT=$("${CRSCTL}" get css misscount | grep misscount | awk '{print $5}')
   DISKTIMEOUT=$("${CRSCTL}" get css disktimeout | grep disktimeout | awk '{print $5}')
-  AUTOSTART=$(cat /etc/oracle/scls_scr/"${HOSTNAME}"/root/crsstart)
-  CLIENT_LOG_COUNT=$(find "${GRID_HOME}"/log/"${HOSTNAME}"/client -maxdepth 1 -name "*.log" | wc -l)
+  AUTOSTART=$(cat /etc/oracle/scls_scr/"$(echo "${HOSTNAME}" | tr '[:upper:]' '[:lower:]')"/root/crsstart)
+  CLIENT_LOG_COUNT=$(find "${GRID_HOME}"/log/"$(echo "${HOSTNAME}" | tr '[:upper:]' '[:lower:]')"/client -maxdepth 1 -name "*.log" | wc -l)
   
   isCHM=$(ps aux | grep -v grep | grep -c osysmond.bin)
   if [ "${isCHM}" -gt 0 ]
@@ -2160,9 +2165,9 @@ function CRSvote () {
   } >> "${OUTPUT}" 2>&1
 }
 
-### Grid ocr
-function CRSocr () { # ocrbackup, olrbackup
-  OCRLOC=$("${GRID_HOME}/bin/ocrcheck" | grep "Device/File Name" | awk '{print $4}')
+### Grid ocr (ocrbackup, olrbackup)
+function CRSocr () {
+  OCRLOC=$("${GRID_HOME}/bin/ocrcheck" | grep "Device/File Name" | awk '{print $4}' | tr "\n" "," | sed 's/.$//')
   OCRBACKUP=$("${GRID_HOME}"/bin/ocrconfig -showbackup | grep ocr)
   OLRBACKUP=$("${GRID_HOME}"/bin/ocrconfig -local -showbackup | grep olr)
   
