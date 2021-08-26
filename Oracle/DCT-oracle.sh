@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.08.19 by ashurei
+# Last Update DATE : 2021.08.26 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -11,7 +11,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.08.19.r01"
+SCRIPT_VER="2021.08.26.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -1114,6 +1114,7 @@ function ORAcommon () {
   { # Insert to output file
     echo $recsep
     echo "##@ ORAcommon"
+    echo "VERSION:${ORACLE_VERSION}"
   } >> "${OUTPUT}"
   
   sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
@@ -2071,8 +2072,8 @@ function ORAparameter () {
 function CRScommon () {
   local MISSCOUNT DISKTIMEOUT AUTOSTART CLIENT_LOG_COUNT isCHM CHM 
   local CLUSTER_STATUS CLUSTER_NAME CLUSTER_NODENAME CLUSTER_NODES
-  MISSCOUNT=$("${CRSCTL}" get css misscount | grep misscount | awk '{print $5}')
-  DISKTIMEOUT=$("${CRSCTL}" get css disktimeout | grep disktimeout | awk '{print $5}')
+  MISSCOUNT=$("${CRSCTL}" get css misscount | grep misscount | sed 's/CRS-4678//' | sed 's/[^0-9]//g')
+  DISKTIMEOUT=$("${CRSCTL}" get css disktimeout | grep disktimeout | sed 's/CRS-4678//' | sed 's/[^0-9]//g')
   AUTOSTART=$(cat /etc/oracle/scls_scr/"$(echo "${HOSTNAME}" | tr '[:upper:]' '[:lower:]')"/root/crsstart)
   CLIENT_LOG_COUNT=$(find "${GRID_HOME}"/log/"$(echo "${HOSTNAME}" | tr '[:upper:]' '[:lower:]')"/client -maxdepth 1 -name "*.log" | wc -l)
   
