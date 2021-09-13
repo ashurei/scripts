@@ -2,16 +2,16 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.08.26 by ashurei
+# Last Update DATE : 2021.09.09 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
-# This script can only be used on Linux platform.
-# This script was created to be run by the Oracle user. 
+# This script can only be used on Linux platform and cannot support 'csh' with cronjob.
+# This script was created to be run by the Oracle user. Excute with Oracle user.
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.08.26.r01"
+SCRIPT_VER="2021.09.09.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -44,7 +44,8 @@ function Get_oracle_env() {
   if [ "${SHELL}" == "/bin/bash" ]
   then
     source ~/.bash_profile
-  else
+  elif [ "${SHELL}" == "/bin/ksh" ]
+  then
     source ~/.profile
   fi
 
@@ -69,9 +70,9 @@ function Get_oracle_env() {
   if [ -n "${GRID_USER}" ]
   then
     # If user length is equal 8, remove '+' (ex. gridSPA+ => gridSPA)
-    if [ "${#GRID_USER}" -eq 8 ]
+    if [ "${GRID_USER:7}" == "+" ]
     then
-      GRID_USER="${GRID_USER:0:-1}"
+      GRID_USER="${GRID_USER:0:7}"
     fi
     GRID_HOME=$(ps aux | grep crsd.bin | grep -v grep | awk -F"/bin/crsd.bin" '{print $1}' | grep -v awk | awk '{print $NF}')
     CRSCTL="${GRID_HOME}/bin/crsctl"
@@ -281,6 +282,7 @@ function Check_sqlplus () {
   if [ "${chkSQLPLUS}" -ge 1 ]
   then
     Print_log "[ERROR] Cannot connect 'sqlplus / as sysdba'. Check sqlnet.ora."
+	Recover_glogin
     exit 1
   fi
 }
@@ -298,7 +300,8 @@ function Check_version () {
     Print_log "## Oracle USER : ${ORACLE_USER}"
     Print_log "## Oracle HOME : ${ORACLE_HOME}"
     Print_log "## Oracle SID : ${ORACLE_SID}"
-    exit
+	Recover_glogin
+    exit 1
   fi
 }
 
@@ -1329,7 +1332,7 @@ function ORAjob () {
   local isAUTOTASK AUTOTASK SQLautotask_client SQLocm SQLawr_snap_interval_min SQLawr_snap_last_time SQLawr_retention_day
   local SQLscheduler_jobs SQLjobs
   
-  # Beyond 11.2
+  # Above 11.2
   if [ "${ORACLE_VERSION_NUM}" -ge "112000" ]
   then
     #SQLautotask="select 'AUTOTASK:' || status from dba_autotask_status;"
@@ -1780,6 +1783,13 @@ function ORAlistener {
       "${ORACLE_HOME}"/bin/lsnrctl status "${LISTENER_NAME}"
       echo
     done
+
+    echo "# listener.ora"
+    /bin/cat "${ORACLE_HOME}"/network/admin/listener.ora
+    echo "# sqlnet.ora"
+    /bin/cat "${ORACLE_HOME}"/network/admin/sqlnet.ora
+    echo "# tnsnames.ora"
+    /bin/cat "${ORACLE_HOME}"/network/admin/tnsnames.ora
   } >> "${OUTPUT}" 2>&1
 }
 
@@ -2085,8 +2095,12 @@ function CRScommon () {
     CHM="disable"
   fi
   
-  CLUSTER_VERSION=$(${CRSCTL} query crs activeversion -f | cut -d"[" -f2 | cut -d"]" -f1)
-  CLUSTER_STATUS=$(${CRSCTL} query crs activeversion -f | cut -d"[" -f3 | cut -d"]" -f1)
+  CLUSTER_VERSION=$(${CRSCTL} query crs activeversion | cut -d"[" -f2 | cut -d"]" -f1)
+  # 'crsctl query crs activeversion' + '-f' option is started in 11.2.0.3
+  if [ "${ORACLE_VERSION_NUM}" -ge "112030" ]
+  then
+    CLUSTER_STATUS=$(${CRSCTL} query crs activeversion -f | cut -d"[" -f3 | cut -d"]" -f1)
+  fi
   CLUSTER_NAME=$("${GRID_HOME}"/bin/olsnodes -c)
   CLUSTER_NODENAME=$("${GRID_HOME}"/bin/olsnodes -l)
   CLUSTER_NODES=$("${GRID_HOME}"/bin/olsnodes | tr "\n" "," | sed 's/.$//')
@@ -2154,11 +2168,11 @@ function CRSstatResInit () {
 function CRSvote () {
   local VOTEINFO VOTEDISK_PERMISSION
 
-  VOTEINFO=$("${CRSCTL}" query css votedisk | grep "\[" | awk '{print $4" "$5}' | sed 's/[()]//g')
-  VOTEDISK_PERMISSION=$("${CRSCTL}" query css votedisk | grep "\[" | awk '{print $4" "$5}' \
-                      | sed 's/[()]//g' | awk '{system("ls -l "$1)}')
-  
   { # Insert to output file
+    VOTEINFO=$("${CRSCTL}" query css votedisk | grep "\[" | awk '{print $4" "$5}' | sed 's/[()]//g')
+    VOTEDISK_PERMISSION=$("${CRSCTL}" query css votedisk | grep "\[" | awk '{print $4" "$5}' \
+                        | sed 's/[()]//g' | awk '{system("ls -l "$1)}')
+
     echo $recsep
     echo "##@ CRSvote"
     echo "${VOTEINFO}"
@@ -2352,6 +2366,27 @@ function ASMparameter () {
   } >> "${OUTPUT}" 2>&1
 }
 
+### Recover glogin.sql
+function Backup_glogin () {
+  local GLOGIN
+  GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
+  isGLOGIN=$(sed '/^$/d' "${GLOGIN}" | grep -cv "\-\-")
+  if [ "${isGLOGIN}" -gt 0 ]
+  then
+    /bin/mv "${GLOGIN}" "${GLOGIN}"_old
+  fi
+}
+  
+### Recover glogin.sql
+function Recover_glogin () {
+  local GLOGIN
+  GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
+  if [ "${isGLOGIN}" -gt 0 ]
+  then
+    /bin/mv "${GLOGIN}"_old "${GLOGIN}"
+  fi
+}
+
 ### Logging error
 function Print_log() {
   local LOG LOGDATE COLLECT_YEAR
@@ -2386,12 +2421,7 @@ Print_log "(${ORACLE_USER}) Start collect"
 for ORACLE_SID in ${ORACLE_SIDs}
 do
   # If there are options in glogin.sql move the file.
-  GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
-  isGLOGIN=$(sed '/^$/d' "${GLOGIN}" | grep -cv "\-\-")
-  if [ "${isGLOGIN}" -gt 0 ]
-  then
-    /bin/mv "${GLOGIN}" "${GLOGIN}"_old
-  fi
+  Backup_glogin
   
   Create_output
   OScommon
@@ -2406,7 +2436,7 @@ do
   
   Check_sqlplus
   Check_version
-  
+    
   # Check ULA option when Oracle version is above 11g.
   if [ "${ORACLE_MAJOR_VERSION}" -ge "11" ]
   then
@@ -2433,10 +2463,7 @@ do
   ORAparameter
   
   # Recover glogin.sql
-  if [ "${isGLOGIN}" -gt 0 ]
-  then
-    /bin/mv "${GLOGIN}"_old "${GLOGIN}"
-  fi
+  Recover_glogin
   
   ### Oracle Grid
   if [ -n "${GRID_USER}" ]
