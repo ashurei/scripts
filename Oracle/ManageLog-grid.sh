@@ -6,7 +6,8 @@
 # Copyright (c) Technical Solution, 2021
 ########################################################
 
-HOSTNAME=$(hostname)
+# This script can only be used on Linux platform.
+
 ################################
 # Need to modify
 GRID_BASE="/oracle/gridbase"
@@ -14,6 +15,7 @@ GRID_HOME="/oracle/grid"
 RETENTION_DAYS="30"
 ################################
 
+HOSTNAME=$(hostname)
 GRID_USER=$(whoami)
 # If user length is equal 8, remove '+' (ex. gridSPA+ => gridSPA)
 if [ "${#GRID_USER}" -eq 8 ]
