@@ -2,7 +2,7 @@
 ########################################################
 # Description : Management of archive logs for Oracle
 # Create DATE : 2021.07.23
-# Last Update DATE : 2021.07.23 by ashurei
+# Last Update DATE : 2021.10.04 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -14,8 +14,9 @@ RETENTION_DAYS="7"
 ################################
 
 set -o posix
-BINDIR="${HOME}/script/rman"
+BINDIR="${HOME}/DBA/script/rman"
 WHOAMI=$(whoami)
+source ~/.bash_profile
 
 # ========== Functions ========== #
 ### Get Oracle environment variable
@@ -31,12 +32,12 @@ function Get_oracle_env() {
 
   # If there is one more ora_pmon process, get only one because this script is for license check.
   ORACLE_USER=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | head -1 | awk '{print $1}')
-  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | awk '{print $NF}' | cut -d'_' -f3-)
 
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
   then
-    ORACLE_HOME=$(env | grep ^ORACLE_HOME | cut -d"=" -f2)
+    ORACLE_HOME=$(env | grep ^ORACLE_HOME | cut -d'=' -f2)
     # If $ORACLE_HOME is not directory or null
     if [[ ! -d "${ORACLE_HOME}" || -z "${ORACLE_HOME}" ]]
     then
@@ -71,10 +72,10 @@ fi
 Get_oracle_env
 
 DATE=$(date '+%Y%m%d')
-RMANLOG="${BINDIR}/delete_archive_${ORACLE_SID}_${DATE}.log"
 
 for ORACLE_SID in ${ORACLE_SIDs}
 do
+  RMANLOG="${BINDIR}/delete_archive_${ORACLE_SID}_${DATE}.log"
   ### Remove output logs
   find "${BINDIR}" -maxdepth 1 -name "delete_archive_${ORACLE_SID}_[0-9]*.log" -mtime +${RETENTION_DAYS} -type f -delete
   
