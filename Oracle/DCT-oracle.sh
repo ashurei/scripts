@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.09.09 by ashurei
+# Last Update DATE : 2021.10.04 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -11,7 +11,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.09.09.r01"
+SCRIPT_VER="2021.10.04.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -37,7 +37,7 @@ function Get_oracle_env() {
 
   # If there is one more ora_pmon process, get only one because this script is for license check.
   ORACLE_USER=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | head -1 | awk '{print $1}')
-  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+  ORACLE_SIDs=$(ps aux | grep ora_pmon | grep -w "^${thisUSER}" | grep -v grep | awk '{print $NF}' | cut -d'_' -f3-)
 
   # Get environment from Oracle user for crontab.
   SHELL=$(grep -w ^"${WHOAMI}" /etc/passwd | awk -F":" '{print $NF}')
@@ -52,7 +52,7 @@ function Get_oracle_env() {
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
   then
-    ORACLE_HOME=$(env | grep ^ORACLE_HOME | cut -d"=" -f2)
+    ORACLE_HOME=$(env | grep ^ORACLE_HOME | cut -d'=' -f2)
     # If $ORACLE_HOME is not directory or null
     if [[ ! -d "${ORACLE_HOME}" || -z "${ORACLE_HOME}" ]]
     then
@@ -117,7 +117,7 @@ function Create_output () {
 function OScommon () {
   local OS OS_ARCH MEMORY_SIZE CPU_MODEL CPU_SOCKET_COUNT CPU_CORE_COUNT CPU_COUNT
   local CPU_SIBLINGS HYPERTHREADING LSCPU MACHINE_TYPE SELINUX UPTIME
-  OS=$(cat /etc/redhat-release)
+  OS=$(cat /etc/redhat-release | head -1)
   OS_ARCH=$(uname -i)
   MEMORY_SIZE=$(grep MemTotal /proc/meminfo | awk '{printf "%.2f", $2/1024/1024}')
   CPU_MODEL=$(grep 'model name' /proc/cpuinfo | awk -F": " '{print $2}' | tail -1 | sed 's/^ *//g')
@@ -152,7 +152,7 @@ function OScommon () {
   SELINUX=$(/usr/sbin/getenforce)
   
   # Uptime (days)
-  UPTIME=$(uptime | cut -d" " -f4)
+  UPTIME=$(uptime | cut -d' ' -f4)
 
   { # Insert to output file
     echo $recsep
@@ -291,7 +291,7 @@ function Check_sqlplus () {
 function Check_version () {
   ORACLE_VERSION=$(Cmd_sqlplus "${COMMON_VAL}" "select version from v\$instance;")
   ORACLE_VERSION_NUM=$(echo "${ORACLE_VERSION}" | tr -d ".")
-  ORACLE_MAJOR_VERSION=$(echo "${ORACLE_VERSION}" | cut -d"." -f1)
+  ORACLE_MAJOR_VERSION=$(echo "${ORACLE_VERSION}" | cut -d'.' -f1)
 
   number='[0-9]'
   if ! [[ "${ORACLE_MAJOR_VERSION}" =~ $number ]]
@@ -458,7 +458,7 @@ function Set_general_var () {
 
 function Check_general_var () {
   local option
-  option=$(cut -d"|" -f"${3}" ${RESULT})
+  option=$(cut -d'|' -f"${3}" ${RESULT})
   eval "$2"='"${option}"'    # Insert "\" because the space of ${option}
 }
 
@@ -1052,7 +1052,7 @@ function Check_option_var() {
   then
     eval "$3"=0   # NO_USAGE ==> 0
   else
-    option=$(grep "${2}" ${RESULT} | cut -d"|" -f6 | grep -cv "NO_USAGE")
+    option=$(grep "${2}" ${RESULT} | cut -d'|' -f6 | grep -cv "NO_USAGE")
     #eval $3="${#option[@]}"     # Count of options
     eval "$3"="${option}"
   fi
@@ -1174,9 +1174,9 @@ EOF
             from dual) scn_stat;
    "
   SCN=$(Cmd_sqlplus "${COMMON_VAL}" "${SQLheadroom}")
-  MAXIMUM_SCN=$(echo "${SCN}" | cut -d":" -f1)
-  CURRENT_SCN=$(echo "${SCN}" | cut -d":" -f2)
-  HEADROOM=$(echo "${SCN}" | cut -d":" -f3)
+  MAXIMUM_SCN=$(echo "${SCN}" | cut -d':' -f1)
+  CURRENT_SCN=$(echo "${SCN}" | cut -d':' -f2)
+  HEADROOM=$(echo "${SCN}" | cut -d':' -f3)
   
   { # Insert to output file
     echo "OSWATCHER:$OSWATCHER"
@@ -1776,9 +1776,9 @@ function ORAlistener {
     LISTENERs=$(ps aux | grep tnslsnr | grep -v grep | awk '{print $1":"$11":"$12}' | sort)
     for listener in ${LISTENERs}
     do
-      LISTENER_USER=$(echo "${listener}" | cut -d":" -f1)
-      LISTENER_NAME=$(echo "${listener}" | cut -d":" -f3)
-      ORACLE_HOME=$(echo "${listener}" | cut -d":" -f2 | awk -F"/bin" '{print $1}')
+      LISTENER_USER=$(echo "${listener}" | cut -d':' -f1)
+      LISTENER_NAME=$(echo "${listener}" | cut -d':' -f3)
+      ORACLE_HOME=$(echo "${listener}" | cut -d':' -f2 | awk -F"/bin" '{print $1}')
       echo "# ${LISTENER_USER}:${ORACLE_HOME}:${LISTENER_NAME}"
       "${ORACLE_HOME}"/bin/lsnrctl status "${LISTENER_NAME}"
       echo
@@ -2095,13 +2095,17 @@ function CRScommon () {
     CHM="disable"
   fi
   
-  CLUSTER_VERSION=$(${CRSCTL} query crs activeversion | cut -d"[" -f2 | cut -d"]" -f1)
+  CLUSTER_VERSION=$(${CRSCTL} query crs activeversion | cut -d'[' -f2 | cut -d']' -f1)
   # 'crsctl query crs activeversion' + '-f' option is started in 11.2.0.3
   if [ "${ORACLE_VERSION_NUM}" -ge "112030" ]
   then
-    CLUSTER_STATUS=$(${CRSCTL} query crs activeversion -f | cut -d"[" -f3 | cut -d"]" -f1)
+    CLUSTER_STATUS=$(${CRSCTL} query crs activeversion -f | cut -d'[' -f3 | cut -d']' -f1)
   fi
-  CLUSTER_NAME=$("${GRID_HOME}"/bin/olsnodes -c)
+  # 'olsnodes' + '-c' option is started in 11g
+  if [ "${ORACLE_VERSION_NUM}" -ge "112000" ]
+  then
+    CLUSTER_NAME=$("${GRID_HOME}"/bin/olsnodes -c)
+  fi
   CLUSTER_NODENAME=$("${GRID_HOME}"/bin/olsnodes -l)
   CLUSTER_NODES=$("${GRID_HOME}"/bin/olsnodes | tr "\n" "," | sed 's/.$//')
   
@@ -2208,7 +2212,7 @@ function CRSresource () {
   
   # CRS vip_stop_dependency
   echo "# VIP stop dependency" >> "${OUTPUT}"
-  CRS_VIP_RES=$(${CRSCTL} stat res | grep "\.vip" | cut -d"=" -f2)
+  CRS_VIP_RES=$(${CRSCTL} stat res | grep "\.vip" | cut -d'=' -f2)
   for vip_res in $CRS_VIP_RES
   do
     GREP=$(${CRSCTL} stat res "$vip_res" -p | grep -i STOP_DEPENDENCIES=)
@@ -2217,7 +2221,7 @@ function CRSresource () {
   
   # CRS action_script
   echo "# Resource action script" >> "${OUTPUT}"
-  CRS_ACT_RES=$(${CRSCTL} stat res | grep "NAME" | cut -d"=" -f2 | cut -d"(" -f1)
+  CRS_ACT_RES=$(${CRSCTL} stat res | grep "NAME" | cut -d'=' -f2 | cut -d'(' -f1)
   for act_res in $CRS_ACT_RES
   do
     GREP=$(${CRSCTL} stat res "${act_res}" -p | grep ACTION_SCRIPT)
@@ -2225,7 +2229,7 @@ function CRSresource () {
   done
   
   # CRS network_ping_target
-  NETWORK_RES=$(${CRSCTL} stat res | grep "\.network" | grep NAME | cut -d"=" -f2)
+  NETWORK_RES=$(${CRSCTL} stat res | grep "\.network" | grep NAME | cut -d'=' -f2)
   {
     echo "# CRS network ping_target"
     ${CRSCTL} stat res "${NETWORK_RES}" -p | grep PING_TARGET | tr "=" ":"
@@ -2322,7 +2326,7 @@ function ASMsystemctl () {
     # If 'systemctl' exists
     if [ -f /bin/systemctl ]
     then
-      SERVICE=$(/bin/systemctl status oracleasm | grep "Loaded" | cut -d"(" -f2 | cut -d";" -f1)
+      SERVICE=$(/bin/systemctl status oracleasm | grep "Loaded" | cut -d'(' -f2 | cut -d';' -f1)
       /bin/cat "${SERVICE}"
     else
 	  echo "This server don't have systemctl."
@@ -2480,7 +2484,7 @@ do
     CRScssd
     if [ "${isASM}" -gt 0 ]
     then
-      ASM_SID=$(ps aux | grep asm_pmon | grep -v grep | awk '{print $NF}' | cut -d"_" -f3)
+      ASM_SID=$(ps aux | grep asm_pmon | grep -v grep | awk '{print $NF}' | cut -d'_' -f3)
 	  
       ASMcommon "${GRID_HOME}" "${ASM_SID}"
       ASMlsdg "${GRID_HOME}" "${ASM_SID}"
