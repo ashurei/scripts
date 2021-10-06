@@ -2,8 +2,8 @@
 #################################################
 # Description : Oracle expdp
 # Create DATE : 2019.12.11
-# Last Update DATE : 2021.09.02 by ashurei
-# Copyright (c) Technical Solution, 2020
+# Last Update DATE : 2021.10.06 by ashurei
+# Copyright (c) ashurei@sk.com, 2021
 #################################################
 
 ### Set variable
@@ -54,7 +54,7 @@ fi
   ### Delete backup files
   echo "[${DATE} $(date '+%H:%M:%S')] Delete backup files"
   # Delete dump and log file 7 day+ ago
-  find ${BACKDIR:?}/dump/*.dmp -mmin +1440 -type f -delete
+  find ${BACKDIR:?}/dump/expdp_${ORACLE_SID}_*.dmp -mmin +1440 -type f -delete
   find ${BACKDIR:?}/oracle_expdp_*.log -mtime +6 -type f -delete
   find ${BACKDIR:?}/conf/init${ORACLE_SID}.ora* -mtime +6 -type f -delete
   find ${BACKDIR:?}/log/*.log -mtime +6 -type f -delete
