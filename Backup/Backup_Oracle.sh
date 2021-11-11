@@ -2,7 +2,7 @@
 #################################################
 # Description : Oracle expdp
 # Create DATE : 2019.12.11
-# Last Update DATE : 2021.10.06 by ashurei
+# Last Update DATE : 2021.11.12 by ashurei
 # Copyright (c) ashurei@sk.com, 2021
 #################################################
 
@@ -57,6 +57,9 @@ fi
   find ${BACKDIR:?}/dump/expdp_${ORACLE_SID}_*.dmp -mmin +1440 -type f -delete
   find ${BACKDIR:?}/oracle_expdp_*.log -mtime +6 -type f -delete
   find ${BACKDIR:?}/conf/init${ORACLE_SID}.ora* -mtime +6 -type f -delete
+  find ${BACKDIR:?}/conf/listener.ora* -mtime +6 -type f -delete
+  find ${BACKDIR:?}/conf/sqlnet.ora* -mtime +6 -type f -delete
+  find ${BACKDIR:?}/conf/tnsnames.ora* -mtime +6 -type f -delete
   find ${BACKDIR:?}/log/*.log -mtime +6 -type f -delete
 } >> "${BACKLOG}" 2>&1
 
