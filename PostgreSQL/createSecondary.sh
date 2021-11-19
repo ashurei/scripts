@@ -18,7 +18,7 @@ TARGET="hola-db-02"
 SLOT="hola_db01"
 
 # Confirm creating secondary node.
-read -s -n 1 -p "$(hostname) will be removed. Confirm (y/n): " INPUT
+read -r -s -n 1 -p "$(hostname) will be removed. Confirm (y/n): " INPUT
 if ! [[ "${INPUT}" =~ [Yy] ]]
 then
   echo "${INPUT}"
@@ -28,17 +28,17 @@ echo "${INPUT}"
 
 # Delete data
 pg_ctl stop -mf
-rm -rf "${PGDATA}"/*
-rm -rf "${PGARCH}"/*
+rm -rf "${PGDATA:?}"/*
+rm -rf "${PGARCH:?}"/*
 
 # Perform pg_basebackup
 pg_basebackup -h "${TARGET}" -U replication -D "${PGDATA}" -p "${PGPORT}" -Xs -P -R
 
 # Config postgresql.auto.conf
-cp ./postgresql.auto.conf ${PGDATA}
+cp ./postgresql.auto.conf "${PGDATA}"
 
 # Delete old logs
-rm -f "${PGDATA}"/log/*.log
+rm -f "${PGDATA:?}"/log/*.log
 
 # Start cluster
 pg_ctl start -D "${PGDATA}" -p "${PGPORT}"
