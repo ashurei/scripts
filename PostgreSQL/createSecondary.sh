@@ -12,9 +12,10 @@
 
 # NODE 1
 PGDATA="/data/pgsql/data"
+PGPORT="5444"
 PGARCH="/data/pgsql/arch"
-TARGET="hola-db-01"
-SLOT="hola_db02"
+TARGET="hola-db-02"
+SLOT="hola_db01"
 
 # Confirm creating secondary node.
 read -s -n 1 -p "$(hostname) will be removed. Confirm (y/n): " INPUT
@@ -31,7 +32,7 @@ rm -rf "${PGDATA}"/*
 rm -rf "${PGARCH}"/*
 
 # Perform pg_basebackup
-pg_basebackup -h "${TARGET}" -U replication -p 5444 -D "${PGDATA}" -Xs -P -R
+pg_basebackup -h "${TARGET}" -U replication -D "${PGDATA}" -p "${PGPORT}" -Xs -P -R
 
 # Config postgresql.auto.conf
 cp ./postgresql.auto.conf ${PGDATA}
@@ -40,7 +41,7 @@ cp ./postgresql.auto.conf ${PGDATA}
 rm -f "${PGDATA}"/log/*.log
 
 # Start cluster
-pg_ctl start
+pg_ctl start -D "${PGDATA}" -p "${PGPORT}"
 
 # Create replication slot
 psql -c "select pg_create_physical_replication_slot('${SLOT}')"
