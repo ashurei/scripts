@@ -10,12 +10,15 @@
 # This script was created to be run by the PostgreSQL user. Excute with postgres user.
 # You need to ready with 'postgresql.auto.conf'
 
+################################
+# Need to modify
 # NODE 1
 PGDATA="/data/pgsql/data"
 PGPORT="5444"
 PGARCH="/data/pgsql/arch"
 TARGET="hola-db-02"
 SLOT="hola_db01"
+################################
 
 # Confirm creating secondary node.
 read -r -s -n 1 -p "$(hostname) will be removed. Confirm (y/n): " INPUT
