@@ -1,4 +1,15 @@
-# 2021.11.18 Modified by ashurei@sk.com
+#!/bin/bash
+########################################################
+# Description : Create PostgreSQL streaming replication
+# Create DATE : 2021.11.18
+# Last Update DATE : 2021.11.19 by ashurei
+# Copyright (c) ashurei@sktelecom.com, 2021
+########################################################
+
+# This script can only be used on Linux platform and cannot support 'csh' with cronjob.
+# This script was created to be run by the PostgreSQL user. Excute with postgres user.
+# You need to ready with 'postgresql.auto.conf'
+
 # NODE 1
 PGDATA="/data/pgsql/data"
 PGARCH="/data/pgsql/arch"
@@ -16,8 +27,8 @@ echo "${INPUT}"
 
 # Delete data
 pg_ctl stop -mf
-rm -rf "${PGDATA}"
-rm -f "${PGARCH}"/*
+rm -rf "${PGDATA}"/*
+rm -rf "${PGARCH}"/*
 
 # Perform pg_basebackup
 pg_basebackup -h "${TARGET}" -U replication -p 5444 -D "${PGDATA}" -Xs -P -R
