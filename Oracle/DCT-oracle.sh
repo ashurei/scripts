@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2021.10.04 by ashurei
+# Last Update DATE : 2021.12.15 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -11,7 +11,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.10.04.r01"
+SCRIPT_VER="2021.12.15.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -2311,7 +2311,7 @@ function ASMlistdisks () {
   { # Insert to output file
     echo $recsep
     echo "##@ ASMlistdisks"
-    /usr/sbin/oracleasm listdisks | xargs oracleasm querydisk -p 
+    /usr/sbin/oracleasm listdisks | xargs /usr/sbin/oracleasm querydisk -p 
   } >> "${OUTPUT}" 2>&1
 }
 
