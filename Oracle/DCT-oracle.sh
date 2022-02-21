@@ -11,7 +11,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2021.12.15.r01"
+SCRIPT_VER="2021.12.15.r02"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -2306,11 +2306,16 @@ function ASMconfigure () {
   } >> "${OUTPUT}" 2>&1
 }
 
-### ASM listdisks
-function ASMlistdisks () {
+### ASM disks
+function ASMdisks () {
   { # Insert to output file
     echo $recsep
     echo "##@ ASMlistdisks"
+    echo "# ls -l /dev/oracleasm/disks"
+    ls -l /dev/oracleasm/disks
+    echo "# ls -l /etc/udev/rules.d"
+    ls -l /etc/udev/rules.d
+    echo "# oracleasm listdisks"
     /usr/sbin/oracleasm listdisks | xargs /usr/sbin/oracleasm querydisk -p 
   } >> "${OUTPUT}" 2>&1
 }
@@ -2489,7 +2494,7 @@ do
       ASMcommon "${GRID_HOME}" "${ASM_SID}"
       ASMlsdg "${GRID_HOME}" "${ASM_SID}"
       ASMconfigure
-      ASMlistdisks
+      ASMdisks
       ASMsystemctl
       ASMalert "${GRID_HOME}" "${ASM_SID}"
       ASMparameter "${GRID_HOME}" "${ASM_SID}"
