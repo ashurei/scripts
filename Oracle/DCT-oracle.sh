@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.03.25 by ashurei
+# Last Update DATE : 2022.03.31 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.03.25.r06"
+SCRIPT_VER="2022.03.31.r02"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -1724,9 +1724,24 @@ function ORApfile () {
   fi
 }
 
+### Backup control file
+function ORAcontrol () {
+  local SQLbackup
+  
+  SQLbackup="alter database backup controlfile to trace as '${RESULT}' reuse;"
+  Cmd_sqlplus "${COMMON_VAL}" "${SQLbackup}"
+
+  { # Insert to output file
+    echo $recsep
+    echo "##@ ORAcontrol"
+    grep -v '^--' "${RESULT}"
+  } >> "${OUTPUT}" 2>&1
+}
+
 ### Oracle Datafiles
 function ORAfile () {
   local SQLdatafile SQLtempfile SQLtotal_free SQLtemp_free
+  
   SQLdatafile="
    col file_name for a60
    col tablespace_name for a20
@@ -2274,13 +2289,14 @@ function ASMparameter () {
   } >> "${OUTPUT}" 2>&1
 }
 
-### Recover glogin.sql
+### Backup glogin.sql
 function Backup_glogin () {
   local GLOGIN
   GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
   isGLOGIN=$(sed '/^$/d' "${GLOGIN}" | grep -cv "\-\-")
   if [ "${isGLOGIN}" -gt 0 ]
   then
+    Print_log "'glogin.sql' is backed up."
     /bin/mv "${GLOGIN}" "${GLOGIN}"_old
   fi
 }
@@ -2291,6 +2307,7 @@ function Recover_glogin () {
   GLOGIN="${ORACLE_HOME}/sqlplus/admin/glogin.sql"
   if [ "${isGLOGIN}" -gt 0 ]
   then
+    Print_log "'glogin.sql' is recovered."
     /bin/mv "${GLOGIN}"_old "${GLOGIN}"
   fi
 }
@@ -2347,14 +2364,9 @@ do
   
   Check_sqlplus
   Check_version
-    
-  # Check ULA option when Oracle version is above 11g.
-  if [ "${ORACLE_MAJOR_VERSION}" -ge "11" ]
-  then
-    ORAoption_general
-    ORAoption_ULA
-  fi
   
+  ORAoption_general
+  ORAoption_ULA
   ORAcommon
   ORAosuser
   ORApatch
@@ -2365,8 +2377,9 @@ do
   ORAlistener
   ORAlistener_ora
   ORApfile
-  ORAdbuser
+  ORAcontrol
   ORAfile
+  ORAdbuser
   ORAredo
   ORAredo_switch
   ORAevent_count
