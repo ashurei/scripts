@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.03.25 by ashurei
+# Last Update DATE : 2022.03.31 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -26,7 +26,7 @@
 #                Information is extracted from DBA_FEATURE_USAGE_STATISTICS view.
 
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.03.25.r11"
+SCRIPT_VER="2022.03.31.r01"
 
 # Get environment from Oracle user for crontab.
 #. ~/.profile
@@ -105,7 +105,14 @@ Get_oracle_env () {
 
 ### Create output file
 Create_output () {
-  typeset DEL_OUT
+  typeset DEL_LOG DEL_OUT
+  # Delete log files 390 days+ ago
+  DEL_LOG=`find ${BINDIR:?}/DCT_"${HOSTNAME}"_*.log -mtime +390 -type f -exec rm -f {} \; 2>&1`
+  if [ -n "${DEL_LOG}" ]   # If $DEL_LOG is exists write to Print_log.
+  then
+    Print_log "${DEL_LOG}"
+  fi
+  
   # Delete output files 14 days+ ago
   DEL_OUT=`find ${BINDIR:?}/DCT_"${HOSTNAME}"_*.out -mtime +14 -type f -exec rm -f {} \; 2>&1`
   if [ -n "${DEL_OUT}" ]
@@ -229,7 +236,7 @@ OSdf () {
   { # Insert to output file
     echo $recsep
     echo "##@ OSdf"
-    if [ "${OS_NAME}" = "HP-UX" ]
+    if [ "${PLATFORM}" = "HP-UX" ]
     then
       /usr/bin/bdf
     else
@@ -1005,7 +1012,7 @@ ORAosuser () {
   { # Insert to output file
     echo $recsep
     echo "##@ ORAosuser"
-	if [ "${OS_NAME}" = "SunOS" ]
+	if [ "${PLATFORM}" = "SunOS" ]
     then
       /usr/xpg4/bin/ulimit -a
     else
