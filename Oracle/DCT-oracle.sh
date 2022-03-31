@@ -328,7 +328,7 @@ function OSmultipath () {
 	# Check /etc/multipath.conf is exists
     if [ -f "/etc/multipath.conf" ]
     then
-      cat /etc/multipath.conf
+      /bin/cat /etc/multipath.conf
     else
       echo "There is no multipath config."
     fi
