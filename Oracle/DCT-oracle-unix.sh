@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.03.31 by ashurei
+# Last Update DATE : 2022.04.05 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -26,10 +26,10 @@
 #                Information is extracted from DBA_FEATURE_USAGE_STATISTICS view.
 
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.03.31.r01"
+SCRIPT_VER="2022.04.05.r01"
 
 # Get environment from Oracle user for crontab.
-#. ~/.profile
+. ~/.profile
 
 LANG=C
 export LANG
@@ -798,7 +798,7 @@ ORAoption_ULA () {
   if [ "${ORACLE_MAJOR_VERSION}" -eq 9 ]
   then
     Cmd_sqlplus "${COMMON_VAL}" "${SQLoracle_option_9i}" > ${RESULT}
-  elif [ "${ORACLE_MAJOR_VERSION}" -ge 11 ]
+  elif [ "${ORACLE_MAJOR_VERSION}" -ge 10 ]
   then
     Cmd_sqlplus "${COMMON_VAL}" "${SQLoracle_option_10R2_later}" > ${RESULT}
   else
@@ -1102,6 +1102,20 @@ ORApfile () {
   else
     /bin/cat "${ORACLE_HOME}/dbs/init${ORACLE_SID}.ora" >> "${OUTPUT}" 2>&1
   fi
+}
+
+### Backup control file
+ORAcontrol () {
+  typeset SQLbackup
+  
+  SQLbackup="alter database backup controlfile to trace as '${RESULT}' reuse;"
+  Cmd_sqlplus "${COMMON_VAL}" "${SQLbackup}"
+
+  { # Insert to output file
+    echo $recsep
+    echo "##@ ORAcontrol"
+    grep -v '^--' "${RESULT}"
+  } >> "${OUTPUT}" 2>&1
 }
 
 ### Oracle Datafiles
@@ -1433,11 +1447,9 @@ do
   
   ORAoption_general
   ORAoption_ULA
-    
   ORAcommon
   ORAosuser
   ORApatch
-  ORAfile
   #ORAprivilege
   #ORAjob
   #ORAcapacity
@@ -1445,13 +1457,15 @@ do
   ORAlistener
   ORAlistener_ora
   ORApfile
+  ORAcontrol
+  ORAfile
   ORAredo
   ORAredo_switch
   ORAevent_count
   ORAevent_group
-  #ORAash
   ORAalert
   ORAparameter
+  
   OSinfo
   
   # Recover glogin.sql
