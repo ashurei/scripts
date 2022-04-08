@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.03.31 by ashurei
+# Last Update DATE : 2022.04.04 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.03.31.r02"
+SCRIPT_VER="2022.04.04.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -866,7 +866,7 @@ function ORAoption_ULA () {
   if [ "${ORACLE_MAJOR_VERSION}" -eq 9 ]
   then
     Cmd_sqlplus "${COMMON_VAL}" "${SQLoracle_option_9i}" > ${RESULT}
-  elif [ "${ORACLE_MAJOR_VERSION}" -ge 11 ]
+  elif [ "${ORACLE_MAJOR_VERSION}" -ge 10 ]
   then
     Cmd_sqlplus "${COMMON_VAL}" "${SQLoracle_option_10R2_later}" > ${RESULT}
   else
