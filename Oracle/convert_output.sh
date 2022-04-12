@@ -6,7 +6,7 @@
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.04.12.r06"
+SCRIPT_VER="2022.04.12.r09"
 
 TODAY=$(date '+%Y%m%d')
 #TODAY="20220409"
@@ -14,8 +14,8 @@ WORKDIR="/backup1/oracle"
 #BACKDIR="/data/data0*/weekly/${TODAY}"      # 정규표현식을 변수에 넣어서 사용할 수 없나?
 TEMPFILE="${WORKDIR}/result.log"
 COLLECT_TIME=$(date '+%Y%m%d_%H%M%S')
-LOGFILE="${WORKDIR}/convert_${TODAY}.log"
-OUTPUT="${WORKDIR}/oracle_license_${TODAY}.out"
+LOGFILE="${WORKDIR}/log/convert_${TODAY}.log"
+OUTPUT="${WORKDIR}/log/oracle_license_${TODAY}.out"
 recsep="#############################################################################################"
 
 # ========== Functions ========== #
@@ -35,7 +35,14 @@ function Process_HA () {
     return 2
   fi
 
-  FILE=$(find /data/data0[1-6]/weekly/${TODAY} -type f -name "$1")
+  FILE=$(find /data/data0[1-6]/weekly/"${TODAY}" -type f -name "$1")
+  # If file is null then return
+  if [ -z "$FILE" ]
+  then
+    echo "[ERROR] $2 is not exists."
+        return 3
+  fi
+
   orgDIR=$(echo "${FILE}" | awk -F'/DCT_' '{print $1}')
   orgHOST=$(echo "${FILE}" | awk -F'/' '{print $NF}' | cut -d'_' -f2)
 
@@ -56,7 +63,16 @@ function Process_HA () {
 }
 
 # ========== Main ========== #
+if [ ! -d "${WORKDIR}/log" ]
+then
+  mkdir -p "${WORKDIR}/log"
+fi
+
 {
+  # Delete log file 14 days+ ago
+  find ${WORKDIR} -regextype posix-extended -regex "${WORKDIR}/log/convert_[0-9]{8}.log" -mtime +14 -type f -delete 2>&1
+  find ${WORKDIR} -regextype posix-extended -regex "${WORKDIR}/log/oracle_license_[0-9]{8}.out" -mtime +14 -type f -delete 2>&1
+
   if [ -f "${OUTPUT}" ]
   then
     cp /dev/null "${OUTPUT}"
@@ -70,7 +86,13 @@ function Process_HA () {
   Process_HA "DCT_basdb5*${TODAY}.out" "basdb5"
 
   # Find output files
-  FILES=$(find /data/data0[1-6]/weekly/${TODAY} -type f -name "*${TODAY}.out")
+  FILES=$(find /data/data0[1-6]/weekly/"${TODAY}" -type f -name "*${TODAY}.out")
+  # If file is null then exit
+  if [ -z "$FILES" ]
+  then
+    echo "[ERROR] There is not output files."
+        exit 1
+  fi
 
   # Convert
   for file in $FILES
@@ -161,7 +183,7 @@ function Process_HA () {
 
     printf "%s%s%s\n" "$OS_COMMON_RESULT" "$DB_OPTION_RESULT" "$DB_GENERAL_RESULT" >> "${OUTPUT}"
   done
-  
+
   # Symbolic link
   SYM="${WORKDIR}/oracle_license.out"
   ln -sf "${OUTPUT}" "${SYM}"
