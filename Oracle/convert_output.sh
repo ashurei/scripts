@@ -2,19 +2,20 @@
 ########################################################
 # Description : Get Data for Oracle license
 # Create DATE : 2022.03.17
-# Last Update DATE : 2022.04.11 by ashurei
+# Last Update DATE : 2022.04.12 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.04.11.r02"
+SCRIPT_VER="2022.04.12.r06"
 
-DIR="/backup1/oracle"
-#TODAY=$(date '+%Y%m%d')
-TODAY="20220409"
-TEMPFILE="${DIR}/result.log"
+TODAY=$(date '+%Y%m%d')
+#TODAY="20220409"
+WORKDIR="/backup1/oracle"
+#BACKDIR="/data/data0*/weekly/${TODAY}"      # 정규표현식을 변수에 넣어서 사용할 수 없나?
+TEMPFILE="${WORKDIR}/result.log"
 COLLECT_TIME=$(date '+%Y%m%d_%H%M%S')
-LOGFILE="${DIR}/convert_${TODAY}.log"
-OUTPUT="${DIR}/oracle_license_${TODAY}.out"
+LOGFILE="${WORKDIR}/convert_${TODAY}.log"
+OUTPUT="${WORKDIR}/oracle_license_${TODAY}.out"
 recsep="#############################################################################################"
 
 # ========== Functions ========== #
@@ -31,11 +32,12 @@ function Process_HA () {
   if [[ -z $1 && -z $2  ]]
   then
     echo "[ERROR] Parameter is null."
-    return -1
+    return 2
   fi
 
-  FILE1=$(find "${DIR}" -type f -name $1)
-  orgHOST=$(echo ${FILE1} | awk -F'/' '{print $NF}' | cut -d'_' -f2)
+  FILE=$(find /data/data0[1-6]/weekly/${TODAY} -type f -name "$1")
+  orgDIR=$(echo "${FILE}" | awk -F'/DCT_' '{print $1}')
+  orgHOST=$(echo "${FILE}" | awk -F'/' '{print $NF}' | cut -d'_' -f2)
 
   # Copy "BASDB01" => "BASDB02" , "basdb52" => "basdb51"
   if [ "${orgHOST}" = "${2}1" ]
@@ -45,27 +47,30 @@ function Process_HA () {
     newHOST="${2}1"
   fi
 
-  newFILE="${DIR}/${TODAY}/DCT_${newHOST}_${TODAY}.out"
-  cp ${FILE1} ${newFILE}
+  newFILE="${orgDIR}/DCT_${newHOST}_${TODAY}.out"
+  cp "${FILE}" "${newFILE}"
 
   # Modify hostname in file
-  sed -i 's/HOSTNAME:'"${orgHOST}"'/HOSTNAME:'"${newHOST}"'/' ${newFILE}
-  sed -i 's/HOST_NAME:'"${orgHOST}"'/HOST_NAME:'"${newHOST}"'/' ${newFILE}
+  sed -i 's/HOSTNAME:'"${orgHOST}"'/HOSTNAME:'"${newHOST}"'/' "${newFILE}"
+  sed -i 's/HOST_NAME:'"${orgHOST}"'/HOST_NAME:'"${newHOST}"'/' "${newFILE}"
 }
-
 
 # ========== Main ========== #
 {
-  cp /dev/null ${OUTPUT}
+  if [ -f "${OUTPUT}" ]
+  then
+    cp /dev/null "${OUTPUT}"
+  fi
+
   echo $recsep
   echo "### COLLECT_TIME : ${COLLECT_TIME}"
 
-  # Copy same file for Active-Standby (BASDB)
-  Process_HA "DCT_BASDB0*0409.out" "BASDB0"
-  Process_HA "DCT_basdb5*0409.out" "basdb5"
+  # Copy same file for Active-Standby (for BASDB)
+  Process_HA "DCT_BASDB0*${TODAY}.out" "BASDB0"
+  Process_HA "DCT_basdb5*${TODAY}.out" "basdb5"
 
   # Find output files
-  FILES=$(find "${DIR}/${TODAY}" -type f -name "*${TODAY}.out")
+  FILES=$(find /data/data0[1-6]/weekly/${TODAY} -type f -name "*${TODAY}.out")
 
   # Convert
   for file in $FILES
@@ -74,9 +79,9 @@ function Process_HA () {
     #ORACLE_USER=$(grep "ORACLE_USER:" "$file" | cut -d':' -f2)
     echo "### os_common ###"
 
-    if grep -A100 -i "##@ OScommon" "$file" | sed '/#####/q' | grep -v '^#' > ${TEMPFILE}
+    if grep -A100 -i "##@ OScommon" "$file" | sed '/#####/q' | grep -v '^#' > "${TEMPFILE}"
     then
-      Set_value ${TEMPFILE}
+      Set_value "${TEMPFILE}"
       OS_COMMON_RESULT=$(printf "%s|" "$HOSTNAME")
       OS_COMMON_RESULT=${OS_COMMON_RESULT}$(printf "%s|" "$OS")
       OS_COMMON_RESULT=${OS_COMMON_RESULT}$(printf "%s|" "$OS_ARCH")
@@ -97,9 +102,9 @@ function Process_HA () {
     #Connect_mysql "insert into collect_info values ('$HOSTNAME','$ORACLE_USER','$ORACLE_SID','$SCRIPT_VER','$COLLECT_TIME','$ORACLE_HOME');"
 
     echo "### ora_option_general ###"
-    if grep -A100 -i "##@ ORAoption_general" "$file" | sed '/#####/q' | grep -v '^#' > ${TEMPFILE}
+    if grep -A100 -i "##@ ORAoption_general" "$file" | sed '/#####/q' | grep -v '^#' > "${TEMPFILE}"
     then
-      Set_value ${TEMPFILE}
+      Set_value "${TEMPFILE}"
       DB_GENERAL_RESULT=$(printf "%s|" "${HOSTNAME}")
       DB_GENERAL_RESULT=${DB_GENERAL_RESULT}$(printf "%s|" "${INSTANCE_NAME}")
       DB_GENERAL_RESULT=${DB_GENERAL_RESULT}$(printf "%s|" "${DATABASE_NAME}")
@@ -120,9 +125,9 @@ function Process_HA () {
     fi
 
     echo "### ora_option_ula ###"
-    if grep -A100 -i "##@ ORAoption_ULA" "$file" | sed '/#####/q' | grep -v '^#' > ${TEMPFILE}
+    if grep -A100 -i "##@ ORAoption_ULA" "$file" | sed '/#####/q' | grep -v '^#' > "${TEMPFILE}"
     then
-      Set_value ${TEMPFILE}
+      Set_value "${TEMPFILE}"
       DB_OPTION_RESULT=$(printf "%s|" "${DATABASE_GATEWAY}")
       DB_OPTION_RESULT=${DB_OPTION_RESULT}$(printf "%s|" "${EXADATA}")
       DB_OPTION_RESULT=${DB_OPTION_RESULT}$(printf "%s|" "${GOLDENGATE}")
@@ -154,17 +159,17 @@ function Process_HA () {
     #  Set_value ${TEMPFILE}
     #fi
 
-    printf "%s%s%s\n" "$OS_COMMON_RESULT" "$DB_OPTION_RESULT" "$DB_GENERAL_RESULT" >> ${OUTPUT}
+    printf "%s%s%s\n" "$OS_COMMON_RESULT" "$DB_OPTION_RESULT" "$DB_GENERAL_RESULT" >> "${OUTPUT}"
   done
-
+  
+  # Symbolic link
+  SYM="${WORKDIR}/oracle_license.out"
+  ln -sf "${OUTPUT}" "${SYM}"
   echo
 } >> "${LOGFILE}" 2>&1
 
-# Symbolic link
-SYM="${DIR}/oracle_license.out"
-ln -sf "${OUTPUT}" "${SYM}"
 
 if [ -f "${TEMPFILE}" ]
 then
-  /bin/rm ${TEMPFILE}
+  /bin/rm "${TEMPFILE}"
 fi
