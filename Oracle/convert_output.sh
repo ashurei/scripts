@@ -2,16 +2,16 @@
 ########################################################
 # Description : Get Data for Oracle license
 # Create DATE : 2022.03.17
-# Last Update DATE : 2022.04.12 by ashurei
+# Last Update DATE : 2022.04.14 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.04.12.r09"
+SCRIPT_VER="2022.04.14.r02"
 
 TODAY=$(date '+%Y%m%d')
 #TODAY="20220409"
 WORKDIR="/backup1/oracle"
-#BACKDIR="/data/data0*/weekly/${TODAY}"      # 정규표현식을 변수에 넣어서 사용할 수 없나?
+BACKDIR="/data/data0[1-6]/weekly/${TODAY}"
 TEMPFILE="${WORKDIR}/result.log"
 COLLECT_TIME=$(date '+%Y%m%d_%H%M%S')
 LOGFILE="${WORKDIR}/log/convert_${TODAY}.log"
@@ -35,12 +35,12 @@ function Process_HA () {
     return 2
   fi
 
-  FILE=$(find /data/data0[1-6]/weekly/"${TODAY}" -type f -name "$1")
+  FILE=$(find ${BACKDIR} -type f -name "$1")
   # If file is null then return
   if [ -z "$FILE" ]
   then
     echo "[ERROR] $2 is not exists."
-        return 3
+    return 3
   fi
 
   orgDIR=$(echo "${FILE}" | awk -F'/DCT_' '{print $1}')
@@ -82,16 +82,16 @@ fi
   echo "### COLLECT_TIME : ${COLLECT_TIME}"
 
   # Copy same file for Active-Standby (for BASDB)
-  Process_HA "DCT_BASDB0*${TODAY}.out" "BASDB0"
-  Process_HA "DCT_basdb5*${TODAY}.out" "basdb5"
+  #Process_HA "DCT_BASDB0*${TODAY}.out" "BASDB0"
+  #Process_HA "DCT_basdb5*${TODAY}.out" "basdb5"
 
   # Find output files
-  FILES=$(find /data/data0[1-6]/weekly/"${TODAY}" -type f -name "*${TODAY}.out")
+  FILES=$(find ${BACKDIR} -type f -name "DCT_*${TODAY}.out")
   # If file is null then exit
   if [ -z "$FILES" ]
   then
     echo "[ERROR] There is not output files."
-        exit 1
+    exit 1
   fi
 
   # Convert
@@ -195,3 +195,4 @@ if [ -f "${TEMPFILE}" ]
 then
   /bin/rm "${TEMPFILE}"
 fi
+
