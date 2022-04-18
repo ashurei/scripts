@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.04.05 by ashurei
+# Last Update DATE : 2022.04.18 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -26,7 +26,7 @@
 #                Information is extracted from DBA_FEATURE_USAGE_STATISTICS view.
 
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.04.05.r01"
+SCRIPT_VER="2022.04.18.r01"
 
 # Get environment from Oracle user for crontab.
 . ~/.profile
@@ -121,6 +121,7 @@ Create_output () {
   fi
 
   # OUTPUT file name
+  umask 0022
   OUTPUT="${BINDIR}/DCT_${HOSTNAME}_${ORACLE_SID}_${COLLECT_DATE}.out"
   { # Insert to output file
     echo "### Data Collection Tool with Oracle"
