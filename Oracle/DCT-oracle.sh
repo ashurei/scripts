@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.04.04 by ashurei
+# Last Update DATE : 2022.04.18 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.04.04.r01"
+SCRIPT_VER="2022.04.18.r02"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -117,6 +117,7 @@ function Create_output () {
   fi
 
   # OUTPUT file name
+  umask 0022
   OUTPUT="${BINDIR}/DCT_${HOSTNAME}_${ORACLE_SID}_${COLLECT_DATE}.out"
   # Insert to output file
   {
