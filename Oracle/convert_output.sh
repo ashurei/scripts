@@ -2,11 +2,11 @@
 ########################################################
 # Description : Get Data for Oracle license
 # Create DATE : 2022.03.17
-# Last Update DATE : 2022.04.27 by ashurei
+# Last Update DATE : 2022.05.30 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.04.27.r02"
+SCRIPT_VER="2022.05.30.r01"
 
 TODAY=$(date '+%Y%m%d')
 #TODAY="20220409"
@@ -185,7 +185,7 @@ fi
   done
 
   # Input TB data
-  cat bak/oracle_license_TB.out >> "${OUTPUT}"
+  cat "${WORKDIR}"/bak/oracle_license_TB.out >> "${OUTPUT}"
 
   # Symbolic link
   SYM="${WORKDIR}/oracle_license.out"
