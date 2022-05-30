@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.04.18 by ashurei
+# Last Update DATE : 2022.05.31 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -26,7 +26,7 @@
 #                Information is extracted from DBA_FEATURE_USAGE_STATISTICS view.
 
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.04.18.r01"
+SCRIPT_VER="2022.05.31.r01"
 
 # Get environment from Oracle user for crontab.
 . ~/.profile
@@ -145,11 +145,7 @@ OScommon () {
     OS=`${MACHINFO} | grep "Release" | "${AWK}" '{print $2,$3}'`
     OS_ARCH=`uname -m`
     
-    if [ -f "/etc/rc.config.d/hpvmconf" ]
-    then
-      HPVM_TYPE=`cat -s /etc/rc.config.d/hpvmconf | grep -i "HPVM_ENABLE" | cut -d '=' -f2`
-    fi
-    
+    HPVM_TYPE=`cat -s /etc/rc.config.d/hpvmconf | grep -i "HPVM_ENABLE" | cut -d '=' -f2`
     if [ "${HPVM_TYPE}" -eq '1' ]
     then
       MACHINE_TYPE=VM
@@ -1059,8 +1055,8 @@ ORAlistener_ora () {
   { # Insert to output file
     echo $recsep
     echo "##@ ORAlistener_ora"
-	# $GRID_HOME is not null
-    if [ -n "${GRID_HOME}" ]
+	# $GRID_USER is not null
+    if [ -n "${GRID_USER}" ]
     then
       echo "#$ listener.ora"
       /bin/cat "${GRID_HOME}"/network/admin/listener.ora
@@ -1346,8 +1342,8 @@ ORAevent_group () {
 ### Oracle alert log (100 lines)
 ORAalert () {
   typeset DIAG_DEST ALERT_LOG
-  DIAG_DEST=`Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='diagnostic_dest';"`
-  DATABASE_NAME=`Cmd_sqlplus "${COMMON_VAL}" "select name from v\$database;" | tr '[:upper:]' '[:lower:]'`
+  DIAG_DEST=`Cmd_sqlplus "${COMMON_VAL}" "select value from v\\\$parameter where name='diagnostic_dest';"`
+  DATABASE_NAME=`Cmd_sqlplus "${COMMON_VAL}" "select name from v\\\$database;" | tr '[:upper:]' '[:lower:]'`
   ALERT_LOG="${DIAG_DEST}/diag/rdbms/${DATABASE_NAME}/${ORACLE_SID}/trace/alert_${ORACLE_SID}.log"
   
   { # Insert to output file
@@ -1368,7 +1364,7 @@ ORAparameter () {
   { # Insert to output file
     echo $recsep
     echo "##@ ORAparameter"
-	Cmd_sqlplus "${COMMON_VAL}" "${SQLparameter}"
+    Cmd_sqlplus "${COMMON_VAL}" "${SQLparameter}"
   } >> "${OUTPUT}" 2>&1
 }
 
