@@ -2,11 +2,11 @@
 ########################################################
 # Description : Get Data for Oracle license
 # Create DATE : 2022.03.17
-# Last Update DATE : 2022.04.14 by ashurei
+# Last Update DATE : 2022.04.27 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.04.14.r02"
+SCRIPT_VER="2022.04.27.r02"
 
 TODAY=$(date '+%Y%m%d')
 #TODAY="20220409"
@@ -82,11 +82,11 @@ fi
   echo "### COLLECT_TIME : ${COLLECT_TIME}"
 
   # Copy same file for Active-Standby (for BASDB)
-  #Process_HA "DCT_BASDB0*${TODAY}.out" "BASDB0"
-  #Process_HA "DCT_basdb5*${TODAY}.out" "basdb5"
+  Process_HA "DCT_BASDB0*${TODAY}.out" "BASDB0"
+  Process_HA "DCT_basdb5*${TODAY}.out" "basdb5"
 
   # Find output files
-  FILES=$(find ${BACKDIR} -type f -name "DCT_*${TODAY}.out")
+  FILES=$(find ${BACKDIR} -type f -name "DCT_*${TODAY}.out")            # 정규표현식이 변수 안에 있는 경우 ""로 묶으면 안됨
   # If file is null then exit
   if [ -z "$FILES" ]
   then
@@ -183,6 +183,9 @@ fi
 
     printf "%s%s%s\n" "$OS_COMMON_RESULT" "$DB_OPTION_RESULT" "$DB_GENERAL_RESULT" >> "${OUTPUT}"
   done
+
+  # Input TB data
+  cat bak/oracle_license_TB.out >> "${OUTPUT}"
 
   # Symbolic link
   SYM="${WORKDIR}/oracle_license.out"
