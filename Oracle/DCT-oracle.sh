@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.04.18.r02"
+SCRIPT_VER="2022.05.26.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -68,7 +68,7 @@ function Get_oracle_env () {
   # If $ORACLE_USER is exist
   if [ -n "${ORACLE_USER}" ]
   then
-    ORACLE_HOME=$(env | grep ^ORACLE_HOME | cut -d'=' -f2)
+    ORACLE_HOME=$(env | grep -w ^ORACLE_HOME | cut -d'=' -f2)
     # If $ORACLE_HOME is not directory or null
     if [[ ! -d "${ORACLE_HOME}" || -z "${ORACLE_HOME}" ]]
     then
@@ -103,14 +103,14 @@ function Get_oracle_env () {
 function Create_output () {
   local DEL_LOG DEL_OUT
   # Delete log files 390 days+ ago
-  DEL_LOG=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_*.log -mtime +390 -type f -delete 2>&1)
+  DEL_LOG=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_${WHOAMI}_*.log -mtime +390 -type f -delete 2>&1)
   if [ -n "${DEL_LOG}" ]   # If $DEL_LOG is exists write to Print_log.
   then
     Print_log "${DEL_LOG}"
   fi
   
   # Delete output files 14 days+ ago
-  DEL_OUT=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_*.out -mtime +14 -type f -delete 2>&1)
+  DEL_OUT=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_${WHOAMI}_*.out -mtime +14 -type f -delete 2>&1)
   if [ -n "${DEL_OUT}" ]   # If $DEL_OUT is exists write to Print_log.
   then
     Print_log "${DEL_OUT}"
@@ -118,7 +118,7 @@ function Create_output () {
 
   # OUTPUT file name
   umask 0022
-  OUTPUT="${BINDIR}/DCT_${HOSTNAME}_${ORACLE_SID}_${COLLECT_DATE}.out"
+  OUTPUT="${BINDIR}/DCT_${HOSTNAME}_${WHOAMI}_${ORACLE_SID}_${COLLECT_DATE}.out"
   # Insert to output file
   {
     echo "### Data Collection Tool with Oracle"
