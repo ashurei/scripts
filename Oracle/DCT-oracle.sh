@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.04.18 by ashurei
+# Last Update DATE : 2022.05.30 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.05.26.r01"
+SCRIPT_VER="2022.05.30.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -90,7 +90,7 @@ function Get_oracle_env () {
     then
       GRID_USER="${GRID_USER:0:7}"
     fi
-    GRID_HOME=$(ps aux | grep crsd.bin | grep -v grep | awk -F"/bin/crsd.bin" '{print $1}' | grep -v awk | awk '{print $NF}')
+    GRID_HOME=$(ps aux | grep ocssd.bin | grep -v grep | awk -F"/bin/ocssd.bin" '{print $1}' | grep -v awk | awk '{print $NF}')
     CRSCTL="${GRID_HOME}/bin/crsctl"
     SRVCTL="${GRID_HOME}/bin/srvctl"
   fi
