@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.05.30 by ashurei
+# Last Update DATE : 2022.05.31 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.05.30.r01"
+SCRIPT_VER="2022.05.31.r08"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -103,14 +103,14 @@ function Get_oracle_env () {
 function Create_output () {
   local DEL_LOG DEL_OUT
   # Delete log files 390 days+ ago
-  DEL_LOG=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_${WHOAMI}_*.log -mtime +390 -type f -delete 2>&1)
+  DEL_LOG=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_"${WHOAMI}"_*.log -mtime +390 -type f -delete 2>&1)
   if [ -n "${DEL_LOG}" ]   # If $DEL_LOG is exists write to Print_log.
   then
     Print_log "${DEL_LOG}"
   fi
   
   # Delete output files 14 days+ ago
-  DEL_OUT=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_${WHOAMI}_*.out -mtime +14 -type f -delete 2>&1)
+  DEL_OUT=$(find ${BINDIR:?}/DCT_"${HOSTNAME}"_"${WHOAMI}"_*.out -mtime +14 -type f -delete 2>&1)
   if [ -n "${DEL_OUT}" ]   # If $DEL_OUT is exists write to Print_log.
   then
     Print_log "${DEL_OUT}"
@@ -139,16 +139,23 @@ function OScommon () {
   OS_ARCH=$(uname -i)
   
   # Check VM with dmesg. If $MACHINE_TYPE is null $MACHINE_TYPE is 'Physical'.
-  MACHINE_TYPE=$(dmesg | grep "Hypervisor detected" | cut -d ':' -f2 | sed 's/^ *//g')
-  if [ -z "${MACHINE_TYPE}" ]
+  isVM1=$(dmesg | grep "Hypervisor detected" | cut -d ':' -f2 | sed 's/^ *//g')
+  isVM2=$(dmesg | grep "^DMI:" | grep VM | cut -c 6- | cut -d',' -f1)	# for RHEL 5
+  if [[ -z "${isVM1}" && -z "${isVM2}" ]]
   then
-    MACHINE_TYPE="Physical"
+	MACHINE_TYPE="Physical"
   else
     MACHINE_TYPE="Unknown"
   fi
 
   MEMORY_SIZE=$(grep "MemTotal" /proc/meminfo | awk '{print $2}')
-  HW_VENDOR=$(cat /sys/devices/virtual/dmi/id/product_name)
+  HW_VENDOR=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null)
+  # Use 'dmesg' with 'DMI' when RHEL version lower than 5
+  if [ -z "${HW_VENDOR}" ]
+  then
+    HW_VENDOR=${isVM2}
+  fi
+  
   PROCESSOR_VERSION=$(grep "model name" /proc/cpuinfo | uniq | cut -d ':' -f2 | sed 's/^ *//' | sed 's/  */ /g')
   PHYSICAL_CORES_OS=$(awk -F: '/^physical/ && !ID[$2] { P++; ID[$2]=1 }; /^cpu cores/ { CORES=$2 };  END { print CORES*P }' /proc/cpuinfo)
   LOGICAL_CORES_OS=$(grep -c processor /proc/cpuinfo)
@@ -338,7 +345,7 @@ function OSmultipath () {
 
 ### Get Oracle result with sqlplus
 function Cmd_sqlplus () {
-  sqlplus -silent / as sysdba 2>/dev/null << EOF
+  sqlplus -silent "/as sysdba" 2>/dev/null << EOF
 $1
 $2
 exit
@@ -974,24 +981,29 @@ function ORAcommon () {
             where status is null and type not in ('STANDBY')
             group by group#) a;
    "
-  SQLactive_session_count="
-   SELECT 'ACTIVE_SESSION_COUNT:' || ACTIVE_SESSION_COUNT
-     FROM (SELECT round(avg(average/100),2) as active_session_count
-             FROM dba_hist_sysmetric_summary
-            WHERE begin_time > sysdate-8
-              and average < 100000
-			  and METRIC_NAME in ('Database Time Per Sec')
-			  and instance_number = (select instance_number from v\$instance)
-		  );
-   "
-  SQLhard_parse="
-   SELECT 'HARD_PARSE_COUNT:' || round(avg(average))
-     FROM dba_hist_sysmetric_summary
-    WHERE begin_time > sysdate-8
-      and average < 500
-      and METRIC_NAME in ('Hard Parse Count Per Sec')
-      and instance_number = (select instance_number from v\$instance);
-   "
+  
+  if [ "${ORACLE_MAJOR_VERSION}" -ge 10 ]
+  then
+    SQLactive_session_count="
+     SELECT 'ACTIVE_SESSION_COUNT:' || ACTIVE_SESSION_COUNT
+       FROM (SELECT round(avg(average/100),2) as active_session_count
+               FROM dba_hist_sysmetric_summary
+              WHERE begin_time > sysdate-8
+                and average < 100000
+	  		  and METRIC_NAME in ('Database Time Per Sec')
+	  		  and instance_number = (select instance_number from v\$instance)
+	  	  );
+     " 
+    SQLhard_parse="
+     SELECT 'HARD_PARSE_COUNT:' || round(avg(average))
+       FROM dba_hist_sysmetric_summary
+      WHERE begin_time > sysdate-8
+        and average < 500
+        and METRIC_NAME in ('Hard Parse Count Per Sec')
+        and instance_number = (select instance_number from v\$instance);
+     "
+  fi
+	 
   SQLlog_archive_dest="select 'LOG_ARCHIVE_DEST:'||replace(value,'?','$ORACLE_HOME') from v\$parameter where name='log_archive_dest';"
   SQLlog_archive_dest_1="select 'LOG_ARCHIVE_DEST_1:'||replace(value,'?','$ORACLE_HOME') from v\$parameter where name='log_archive_dest_1';"
   SQLarchivelog_1day_mbytes="
@@ -1007,7 +1019,7 @@ function ORAcommon () {
     echo "VERSION:${ORACLE_VERSION}"
   } >> "${OUTPUT}"
   
-  sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
+  sqlplus -silent "/as sysdba" 2>/dev/null >> "${OUTPUT}" << EOF
   $COMMON_VAL
   $SQLcollection_day
   $SQLinstance_name
@@ -1044,7 +1056,7 @@ EOF
 
   # Audit file
   AUDIT_FILE_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='audit_file_dest';")
-  AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST}" -maxdepth 1 -type f -name "*.aud" | wc -l)
+  AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST/\?/$ORACLE_HOME}" -maxdepth 1 -type f -name "*.aud" | wc -l)
   
   # Headroom
   SQLheadroom="
@@ -1202,7 +1214,7 @@ function ORAprivilege () {
     echo "##@ ORAprivilege"
   } >> "${OUTPUT}" 2>&1
   
-  sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
+  sqlplus -silent "/as sysdba" 2>/dev/null >> "${OUTPUT}" << EOF
   $COMMON_VAL
   prompt #$ dba_role_privs
   $SQLrole_privs
@@ -1242,20 +1254,24 @@ function ORAjob () {
       where client_name in ('auto space advisor','auto optimizer stats collection','sql tuning advisor');
      "
   fi
-  
-  SQLocm="select job_name || ':' || enabled from dba_scheduler_jobs where owner='ORACLE_OCM';"
 
-  SQLawr_snap_interval_min="select 'AWR_SNAP_INTERVAL_MIN:'||(60*extract(hour from SNAP_INTERVAL)+extract(minute from SNAP_INTERVAL)) from dba_hist_wr_control;"
-  SQLawr_snap_last_time="select 'AWR_SNAP_LAST_TIME:'||max(to_char(end_interval_time,'YYYYMMDD-HH24MISS')) from dba_hist_snapshot;"
-  SQLawr_retention_day="select 'AWR_RETENTION_DAY:'||extract(day from retention) from dba_hist_wr_control;"
+  if [ "${ORACLE_MAJOR_VERSION}" -ge 10 ]
+  then  
+    SQLocm="select job_name || ':' || enabled from dba_scheduler_jobs where owner='ORACLE_OCM';"
+    
+    SQLawr_snap_interval_min="select 'AWR_SNAP_INTERVAL_MIN:'||(60*extract(hour from SNAP_INTERVAL)+extract(minute from SNAP_INTERVAL)) from dba_hist_wr_control;"
+    SQLawr_snap_last_time="select 'AWR_SNAP_LAST_TIME:'||max(to_char(end_interval_time,'YYYYMMDD-HH24MISS')) from dba_hist_snapshot;"
+    SQLawr_retention_day="select 'AWR_RETENTION_DAY:'||extract(day from retention) from dba_hist_wr_control;"
+    
+    # dba_scheduler_jobs in failure count
+    SQLscheduler_jobs="
+     select owner ||':'|| job_name ||':'|| enabled ||':'|| state ||':'|| failure_count
+       from dba_scheduler_jobs
+      where state='SCHEDULED'
+        and failure_count > 0;
+     "
+  fi
   
-  # dba_scheduler_jobs in failure count
-  SQLscheduler_jobs="
-   select owner ||':'|| job_name ||':'|| enabled ||':'|| state ||':'|| failure_count
-     from dba_scheduler_jobs
-    where state='SCHEDULED'
-      and failure_count > 0;
-   "
   SQLjobs="
    select job ||':'||
           schema_user ||':'||
@@ -1276,7 +1292,7 @@ function ORAjob () {
     echo "AUTOTASK:$AUTOTASK"
   } >> "${OUTPUT}" 2>&1
   
-  sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
+  sqlplus -silent "/as sysdba" 2>/dev/null >> "${OUTPUT}" << EOF
   $COMMON_VAL
   $SQLautotask_client
   $SQLocm
@@ -1296,79 +1312,83 @@ EOF
 function ORAcapacity () {
   local SQLcpu SQLresource_limit SQLanalyzed_table_count SQLsqlarea_data SQLactivesession_per_cpu SQLresource_manager
 
-  SQLcpu="
-   SELECT 'CPU_USAGE:' ||
-          round(avg(utpct)+avg(stpct)) ||':'||
-          round(avg(utpct))   ||':'||
-          round(avg(stpct))   ||':'||
-          round(avg(iowtpct)) ||':'||
-          round(avg(itpct))
-     FROM
-           (
-           select  to_char(begintime,'DD-MON-YY HH24:MI:SS') begintime,
-                           to_char(endtime,'DD-MON-YY HH24:MI:SS') endtime,
-                           inst,
-                           snapid,
-                           round((utdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)  utpct,
-                           round((ntdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)  ntpct,
-                           round((stdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)  stpct,
-                           round((iowtdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)  iowtpct,
-                           (100-
-                                   (round((utdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)+
-                                   round((ntdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)+
-                                   round((stdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)+
-                                   round((iowtdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)
-                                   )
-                           ) itpct
-           from
-                   (
-                   select  begintime,
-                                   endtime,
-                                   (extract(Minute from endtime-begintime)*60 + extract(Second from endtime-begintime)) secs,
-                                   snapid,
-                                   inst,
-                                   ut-(nvl(lag(ut) over (partition by inst order by inst,snapid),0)) utdiff,
-                                   bt-(nvl(lag(bt) over (partition by inst order by inst,snapid),0)) btdiff,
-                                   it-(nvl(lag(it) over (partition by inst order by inst,snapid),0)) itdiff,
-                                   st-(nvl(lag(st) over (partition by inst order by inst,snapid),0)) stdiff,
-                                   iowt-(nvl(lag(iowt) over (partition by inst order by inst,snapid),0)) iowtdiff,
-                                   nt-(nvl(lag(nt) over (partition by inst order by inst,snapid),0)) ntdiff,
-                                   vin-(nvl(lag(vin) over (partition by inst order by inst,snapid),0)) vindiff,
-                                   vout-(nvl(lag(vout) over (partition by inst order by inst,snapid),0)) voutdiff
-                   from
-                           (
-                           select  sn.begin_interval_time begintime,
-                                           sn.end_interval_time EndTime,oss.snap_id SnapId,oss.instance_number Inst,
-                                           sum(decode(oss.stat_name,'USER_TIME',value,0)) ut,
-                                           sum(decode(oss.stat_name,'BUSY_TIME',value,0)) bt,
-                                           sum(decode(oss.stat_name,'IDLE_TIME',value,0)) it,
-                                           sum(decode(oss.stat_name,'SYS_TIME',value,0)) st,
-                                           sum(decode(oss.stat_name,'IOWAIT_TIME',value,0)) iowt,
-                                           sum(decode(oss.stat_name,'NICE_TIME',value,0)) nt,
-                                           sum(decode(oss.stat_name,'VM_IN_BYTES',value,0)) vin,
-                                           sum(decode(oss.stat_name,'VM_OUT_BYTES',value,0)) vout
-                           from    dba_hist_osstat oss,dba_hist_snapshot sn
-                           where   oss.dbid = sn.dbid
-                             and   oss.instance_number =  sn.instance_number
-                             and   oss.snap_id = sn.snap_id
-                             and   sn.end_interval_time>sysdate-8
-                             and   oss.stat_name in (
-                                           'USER_TIME',
-                                           'BUSY_TIME',
-                                           'IDLE_TIME',
-                                           'SYS_TIME',
-                                           'IOWAIT_TIME',
-                                           'NICE_TIME',
-                                           'VM_IN_BYTES',
-                                           'VM_OUT_BYTES'
-                                           )
-                             and   oss.instance_number = (select instance_number from v\$instance)
-                           group by sn.begin_interval_time,sn.end_interval_time,oss.snap_id,oss.instance_number
-                           order by oss.snap_id
-                           )
-                   )
-           );
-   "
+  if [ "${ORACLE_MAJOR_VERSION}" -ge 10 ]
+  then
+    SQLcpu="
+     SELECT 'CPU_USAGE:' ||
+            round(avg(utpct)+avg(stpct)) ||':'||
+            round(avg(utpct))   ||':'||
+            round(avg(stpct))   ||':'||
+            round(avg(iowtpct)) ||':'||
+            round(avg(itpct))
+       FROM
+             (
+             select  to_char(begintime,'DD-MON-YY HH24:MI:SS') begintime,
+                             to_char(endtime,'DD-MON-YY HH24:MI:SS') endtime,
+                             inst,
+                             snapid,
+                             round((utdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)  utpct,
+                             round((ntdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)  ntpct,
+                             round((stdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)  stpct,
+                             round((iowtdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)  iowtpct,
+                             (100-
+                                     (round((utdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)+
+                                     round((ntdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)+
+                                     round((stdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)+
+                                     round((iowtdiff/(utdiff+itdiff+stdiff+iowtdiff+ntdiff))*100)
+                                     )
+                             ) itpct
+             from
+                     (
+                     select  begintime,
+                                     endtime,
+                                     (extract(Minute from endtime-begintime)*60 + extract(Second from endtime-begintime)) secs,
+                                     snapid,
+                                     inst,
+                                     ut-(nvl(lag(ut) over (partition by inst order by inst,snapid),0)) utdiff,
+                                     bt-(nvl(lag(bt) over (partition by inst order by inst,snapid),0)) btdiff,
+                                     it-(nvl(lag(it) over (partition by inst order by inst,snapid),0)) itdiff,
+                                     st-(nvl(lag(st) over (partition by inst order by inst,snapid),0)) stdiff,
+                                     iowt-(nvl(lag(iowt) over (partition by inst order by inst,snapid),0)) iowtdiff,
+                                     nt-(nvl(lag(nt) over (partition by inst order by inst,snapid),0)) ntdiff,
+                                     vin-(nvl(lag(vin) over (partition by inst order by inst,snapid),0)) vindiff,
+                                     vout-(nvl(lag(vout) over (partition by inst order by inst,snapid),0)) voutdiff
+                     from
+                             (
+                             select  sn.begin_interval_time begintime,
+                                             sn.end_interval_time EndTime,oss.snap_id SnapId,oss.instance_number Inst,
+                                             sum(decode(oss.stat_name,'USER_TIME',value,0)) ut,
+                                             sum(decode(oss.stat_name,'BUSY_TIME',value,0)) bt,
+                                             sum(decode(oss.stat_name,'IDLE_TIME',value,0)) it,
+                                             sum(decode(oss.stat_name,'SYS_TIME',value,0)) st,
+                                             sum(decode(oss.stat_name,'IOWAIT_TIME',value,0)) iowt,
+                                             sum(decode(oss.stat_name,'NICE_TIME',value,0)) nt,
+                                             sum(decode(oss.stat_name,'VM_IN_BYTES',value,0)) vin,
+                                             sum(decode(oss.stat_name,'VM_OUT_BYTES',value,0)) vout
+                             from    dba_hist_osstat oss,dba_hist_snapshot sn
+                             where   oss.dbid = sn.dbid
+                               and   oss.instance_number =  sn.instance_number
+                               and   oss.snap_id = sn.snap_id
+                               and   sn.end_interval_time>sysdate-8
+                               and   oss.stat_name in (
+                                             'USER_TIME',
+                                             'BUSY_TIME',
+                                             'IDLE_TIME',
+                                             'SYS_TIME',
+                                             'IOWAIT_TIME',
+                                             'NICE_TIME',
+                                             'VM_IN_BYTES',
+                                             'VM_OUT_BYTES'
+                                             )
+                               and   oss.instance_number = (select instance_number from v\$instance)
+                             group by sn.begin_interval_time,sn.end_interval_time,oss.snap_id,oss.instance_number
+                             order by oss.snap_id
+                             )
+                     )
+             );
+     "
+  fi
+  
   SQLresource_limit="
    select rtrim(resource_name) ||':'||
           rtrim(current_utilization) ||':'||
@@ -1387,108 +1407,112 @@ function ORAcapacity () {
     group by to_char(last_analyzed,'yyyymmdd')
     order by to_char(last_analyzed,'yyyymmdd');
    "
-  SQLsqlarea_data="
-   with sqla as
-   (
-     select sql_id, parsing_schema_name, executions, buffer_gets, rows_processed, elapsed_time, substr(sql_text,1,60)||'....' sql_text
-       from v\$sqlarea
-      where executions > 1
-        and parsing_user_id in (select user_id from dba_users
-                                 where username not in ('SYS','SYSTEM','SYSMAN','DBSNMP','WMSYS','EXFSYS','CTXSYS','XDB','ORDSYS','MDSYS','OLAPSYS','OUTLN','APEX_030200','ORDDATA','OWBSYS','APPQOSSYS'))
-   )
-   select 'NeedIndex: ' || object_owner ||':'|| object_name ||':'|| operation ||' '|| sum(a.executions) ||':'|| t.num_rows ||':'|| filter_predicates
-     from sqla a, v\$sql_plan p, dba_tables t
-    where p.options = 'FULL'
-      and p.filter_predicates is not null
-      and p.sql_id = a.sql_id
-      and p.object_name = t.table_name
-      and p.object_owner = t.owner
-      and t.num_rows > 10000
-      and a.executions > 10
-    group by object_owner, object_name, operation, t.num_rows, filter_predicates
-   union all
-   select 'SQL: Top-' || rank ||'. '|| sql_id ||' :   '|| round(eb,2) ||' (BufGets / Rows)   '|| sql_text
-     from
+  
+  if [ "${ORACLE_MAJOR_VERSION}" -ge 10 ]
+  then
+    SQLsqlarea_data="
+     with sqla as
      (
-       select rownum rank, a.*
-         from
-         (
-           select sql_id, case when rows_processed = 0 then 0 else buffer_gets/rows_processed end eb, sql_text
-             from sqla
-            order by 2 desc
-         ) a
-        where rownum <= 10
+       select sql_id, parsing_schema_name, executions, buffer_gets, rows_processed, elapsed_time, substr(sql_text,1,60)||'....' sql_text
+         from v\$sqlarea
+        where executions > 1
+          and parsing_user_id in (select user_id from dba_users
+                                   where username not in ('SYS','SYSTEM','SYSMAN','DBSNMP','WMSYS','EXFSYS','CTXSYS','XDB','ORDSYS','MDSYS','OLAPSYS','OUTLN','APEX_030200','ORDDATA','OWBSYS','APPQOSSYS'))
      )
-   where eb >= 100
-   union all
-   select 'Space advisor: Top-' || rank ||'. '|| sql_id ||'  '|| sql_text
-     from
-     (
-       select rownum rank, a.*
-         from
-         (
-           select sql_id, elapsed_time, parsing_schema_name, sql_text
-             from sqla
-            order by 2 desc
-         ) a
-       where rownum <= 50
-     )
-    where sql_text like '%%dbms_stats.auto_space_advisor_job_proc%' or sql_text like 'insert into wri\$_adv_objspace_trend_data%'
-      and parsing_schema_name = 'SYS'
-    order by 1
-   ;
-   "
-  SQLactivesession_per_cpu="
-   select 'Active session per CPU:' || round(avg(case when value = 0 then average else average/value end),5)
-     from dba_hist_sysmetric_summary sy, dba_hist_osstat os
-    where sy.snap_id = os.snap_id
-      and sy.dbid = os.dbid
-      and sy.instance_number = os.instance_number
-      and begin_time > sysdate - 8
-      and metric_id = 2147
-      and stat_id = 16
-   union all
-   select 'Event-' || rownum ||'. '|| event_name ||'   '|| timew || '(sec)' output
-     from
-     (
-       select event_name, round((maxtm-mintm)/cnt,3) timew, maxtm, mintm, cnt
-         from
-         (
-           select sy.event_name
-                , round(min(sy.time_waited_micro)/1000/1000) mintm
-                , round(max(sy.time_waited_micro)/1000/1000) maxtm
-                , count(*) cnt
-             from dba_hist_system_event sy
-                , dba_hist_snapshot sn
-            where sy.dbid = sn.dbid
-              and sy.instance_number = sn.instance_number
-              and sy.snap_id = sn.snap_id
-              and sn.begin_interval_time > sysdate-8
-              and sy.wait_class <> 'Idle'
-            group by sy.event_name
-         )
-       order by 2 desc
-     )
-   where rownum <= 10;
-   "
-  SQLresource_manager="
-   select 'Plan:' || name ||':'||
-          case when name in ('INTERNAL_PLAN','DEFAULT_PLAN','DEFAULT_MAINTENANCE_PLAN') then 'Default' else 'User-defined' end output
-     from v\$rsrc_plan
-    where is_top_plan = 'TRUE'
-   union all
-   select 'Parameter:' || name ||':'|| value
-     from v\$parameter
-	where name = 'resource_manager_plan'
-	  and (value is NULL or value = 'FORCE:');
-   "
+     select 'NeedIndex: ' || object_owner ||':'|| object_name ||':'|| operation ||' '|| sum(a.executions) ||':'|| t.num_rows ||':'|| filter_predicates
+       from sqla a, v\$sql_plan p, dba_tables t
+      where p.options = 'FULL'
+        and p.filter_predicates is not null
+        and p.sql_id = a.sql_id
+        and p.object_name = t.table_name
+        and p.object_owner = t.owner
+        and t.num_rows > 10000
+        and a.executions > 10
+      group by object_owner, object_name, operation, t.num_rows, filter_predicates
+     union all
+     select 'SQL: Top-' || rank ||'. '|| sql_id ||' :   '|| round(eb,2) ||' (BufGets / Rows)   '|| sql_text
+       from
+       (
+         select rownum rank, a.*
+           from
+           (
+             select sql_id, case when rows_processed = 0 then 0 else buffer_gets/rows_processed end eb, sql_text
+               from sqla
+              order by 2 desc
+           ) a
+          where rownum <= 10
+       )
+     where eb >= 100
+     union all
+     select 'Space advisor: Top-' || rank ||'. '|| sql_id ||'  '|| sql_text
+       from
+       (
+         select rownum rank, a.*
+           from
+           (
+             select sql_id, elapsed_time, parsing_schema_name, sql_text
+               from sqla
+              order by 2 desc
+           ) a
+         where rownum <= 50
+       )
+      where sql_text like '%%dbms_stats.auto_space_advisor_job_proc%' or sql_text like 'insert into wri\$_adv_objspace_trend_data%'
+        and parsing_schema_name = 'SYS'
+      order by 1
+     ;
+     "
+    SQLactivesession_per_cpu="
+     select 'Active session per CPU:' || round(avg(case when value = 0 then average else average/value end),5)
+       from dba_hist_sysmetric_summary sy, dba_hist_osstat os
+      where sy.snap_id = os.snap_id
+        and sy.dbid = os.dbid
+        and sy.instance_number = os.instance_number
+        and begin_time > sysdate - 8
+        and metric_id = 2147
+        and stat_id = 16
+     union all
+     select 'Event-' || rownum ||'. '|| event_name ||'   '|| timew || '(sec)' output
+       from
+       (
+         select event_name, round((maxtm-mintm)/cnt,3) timew, maxtm, mintm, cnt
+           from
+           (
+             select sy.event_name
+                  , round(min(sy.time_waited_micro)/1000/1000) mintm
+                  , round(max(sy.time_waited_micro)/1000/1000) maxtm
+                  , count(*) cnt
+               from dba_hist_system_event sy
+                  , dba_hist_snapshot sn
+              where sy.dbid = sn.dbid
+                and sy.instance_number = sn.instance_number
+                and sy.snap_id = sn.snap_id
+                and sn.begin_interval_time > sysdate-8
+                and sy.wait_class <> 'Idle'
+              group by sy.event_name
+           )
+         order by 2 desc
+       )
+     where rownum <= 10;
+     "
+    SQLresource_manager="
+     select 'Plan:' || name ||':'||
+            case when name in ('INTERNAL_PLAN','DEFAULT_PLAN','DEFAULT_MAINTENANCE_PLAN') then 'Default' else 'User-defined' end output
+       from v\$rsrc_plan
+      where is_top_plan = 'TRUE'
+     union all
+     select 'Parameter:' || name ||':'|| value
+       from v\$parameter
+	  where name = 'resource_manager_plan'
+	    and (value is NULL or value = 'FORCE:');
+     "
+  fi
 
   { # Insert to output file
     echo $recsep
     echo "##@ ORAcapacity"
   } >> "${OUTPUT}" 2>&1
   
-  sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
+  sqlplus -silent "/as sysdba" 2>/dev/null >> "${OUTPUT}" << EOF
   $COMMON_VAL
   $SQLcpu
   prompt #$ resource_limit
@@ -1585,7 +1609,11 @@ function ORAetc () {
   SQLdb_link="select rtrim(owner) ||':'|| rtrim(db_link) from dba_db_links order by owner;"     # SYS:SYS_HUB
   SQL2pc_pending="select rtrim(local_tran_id) ||':'|| rtrim(global_tran_id) ||':'|| to_char(fail_time,'YYYYMMDDHH24MISS') ||':'|| rtrim(state) ||':'|| mixed from dba_2pc_pending;"
   
-  SQLrecyclebin="select owner, object_name, original_name, operation, droptime from dba_recyclebin;"
+  if [ "${ORACLE_MAJOR_VERSION}" -ge 10 ]
+  then
+    SQLrecyclebin="select owner, object_name, original_name, operation, droptime from dba_recyclebin;"
+  fi
+  
   SQLobjects="
    select owner ||':'|| object_type ||':'|| count(*)
      from dba_objects
@@ -1618,7 +1646,7 @@ function ORAetc () {
     echo "##@ ORAetc"
   } >> "${OUTPUT}" 2>&1
   
-  sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
+  sqlplus -silent "/as sysdba" 2>/dev/null >> "${OUTPUT}" << EOF
   $COMMON_VAL
   prompt #$ invalid_object
   $SQLinvalid_object
@@ -1794,7 +1822,7 @@ function ORAfile () {
     echo "##@ ORAfile"
   } >> "${OUTPUT}" 2>&1
   
-  sqlplus -silent / as sysdba 2>/dev/null >> "${OUTPUT}" << EOF
+  sqlplus -silent "/as sysdba" 2>/dev/null >> "${OUTPUT}" << EOF
   $COLLECT_VAL
   prompt #$ Datafiles
   $SQLdatafile
@@ -2189,7 +2217,7 @@ function ASMcommon () {
 
   local AUDIT_FILE_DEST AUDIT_FILE_COUNT
   AUDIT_FILE_DEST=$(Cmd_sqlplus "${COMMON_VAL}" "select value from v\$parameter where name='audit_file_dest';")
-  AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST}" -maxdepth 1 -name "*.aud" | wc -l)
+  AUDIT_FILE_COUNT=$(find "${AUDIT_FILE_DEST/\?/$ORACLE_HOME}" -maxdepth 1 -name "*.aud" | wc -l)
 
   { # Insert to output file
     echo $recsep
@@ -2382,9 +2410,14 @@ do
   ORAfile
   ORAdbuser
   ORAredo
-  ORAredo_switch
-  ORAevent_count
-  ORAevent_group
+  
+  if [ "${ORACLE_MAJOR_VERSION}" -ge 10 ]
+  then
+    ORAredo_switch
+    ORAevent_count
+    ORAevent_group
+  fi
+  
   ORAalert
   ORAparameter
   
