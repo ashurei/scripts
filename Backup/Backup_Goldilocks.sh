@@ -2,11 +2,11 @@
 ########################################################
 # Description : Goldilocks Hot Backup
 # Create DATE : 2022.07.13
-# Last Update DATE : 2022.07.13 by ashurei
-# Copyright (c) ashurei@sktelecom.com, 2021
+# Last Update DATE : 2022.07.14 by ashurei
+# Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.07.14.r08"
+SCRIPT_VER="2022.07.14.r09"
 TODAY=$(date '+%Y%m%d')
 BACKDIR="/goldilocks_data/backup"
 TARGETDIR="${BACKDIR}/${TODAY}"
@@ -105,6 +105,14 @@ function Get_datafile () {
   fi
 
   Cmd_gsql "select datafile_name from v\$datafile where tbs_name='$1';"
+}
+
+### Delete old backup
+function Delete_backup () {
+  # Delete old backup
+  find ${BACKDIR:?} -mtime +2 -type d -regextype posix-extended -regex "${BACKDIR}/[0-9]{8}" -print0 | xargs -0 rm -r
+  # Delete old logs
+  find ${BACKDIR:?}/Backup_goldilocks_*.log -mtime +7 -type f -delete 2>&1
 }
 
 ### Backup controlfile
@@ -235,6 +243,7 @@ Check_size
 Check_begin
 
 # Backup
+Delete_backup
 Backup_controlfile
 Backup_config
 Backup_datafile
