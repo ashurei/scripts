@@ -2,15 +2,16 @@
 ########################################################
 # Description : Goldilocks Hot Backup
 # Create DATE : 2022.07.13
-# Last Update DATE : 2022.07.14 by ashurei
+# Last Update DATE : 2022.08.08 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.07.14.r09"
+SCRIPT_VER="2022.08.08.r05"
 TODAY=$(date '+%Y%m%d')
-BACKDIR="/goldilocks_data/backup"
+BACKDIR="/goldilocks/backup"
 TARGETDIR="${BACKDIR}/${TODAY}"
-GSQL="gsql sys gliese --dsn GOLDILOCKS --no-prompt"
+WHOAMI=$(whoami)
+GSQL="gsql sys SKTelecom!2#4 --dsn GOLDILOCKS --no-prompt"
 COMMON="
 \set linesize 300
 \set heading off
@@ -21,16 +22,29 @@ COMMON="
 # ========== Functions ========== #
 ### Get Goldilocks result with sqlplus
 function Cmd_gsql () {
-  ${GSQL} "$2" << EOF | head -n -2 | sed '/^$/d'
-  ${COMMON}
-  $1
+  ${GSQL} "$2" << EOF | sed '/^$/d' | grep -v " selected."
+${COMMON}
+$1
 EOF
+}
+
+### Check gsql
+function Check_gsql () {
+  local CHK
+  CHK=$(Cmd_gsql "select 1 from dual;" | grep "ERR-")
+  # $CHK is not null
+  if [ -n "${CHK}" ]
+  then
+    Print_log "[ERROR] Cannot connect 'gsql'."
+    Print_log "${CHK}"
+    exit 1
+  fi
 }
 
 ### Check gmaster process
 function Check_gmaster () {
   local CHK
-  CHK=$(ps ax | grep gmaster | grep -v grep)
+  CHK=$(ps aux | grep -w "${WHOAMI}" | grep gmaster)
   if [ -z "${CHK}" ]
   then
     Print_log "[ERROR] There is not goldilocks process."
@@ -77,7 +91,7 @@ function Check_size () {
   SUM=0
   for file in $FILES
   do
-    SIZE=$(ls -al "$file" | awk '{print $5}')
+    SIZE=$(stat -c%s "$file")
     SUM=$((SUM + SIZE))
   done
 
@@ -119,7 +133,7 @@ function Delete_backup () {
 function Backup_controlfile () {
   CTRL="${TARGETDIR}/control_backup_${TODAY}.ctl"
   Cmd_gsql "alter database backup controlfile to '${CTRL}';" "--silent"
-  
+
   if [ -f "${CTRL}" ]
   then
     Print_log "Control file is backup to ${CTRL}."
@@ -131,7 +145,7 @@ function Backup_controlfile () {
 ### Backup config files
 function Backup_config () {
   local file FILES
-  FILE=$(Cmd_gsql "select file_name from v\$db_file where file_type='Config File';")
+  FILES=$(Cmd_gsql "select file_name from v\$db_file where file_type='Config File';")
 
   for file in $FILES
   do
@@ -158,7 +172,7 @@ function Backup_datafile () {
   do
     # Begin backup
     Cmd_gsql "alter tablespace $tbs begin backup at ${DBNAME};" "--silent"
-	Print_log "alter tablespace $tbs begin backup at ${DBNAME};"
+        Print_log "alter tablespace $tbs begin backup at ${DBNAME};"
 
     # Copy files
     FILES=$(Get_datafile "$tbs")
@@ -170,7 +184,7 @@ function Backup_datafile () {
 
     # End backup
     Cmd_gsql "alter tablespace $tbs end backup at ${DBNAME};" "--silent"
-	Print_log "alter tablespace $tbs end backup at ${DBNAME};"
+        Print_log "alter tablespace $tbs end backup at ${DBNAME};"
   done
 }
 
@@ -183,7 +197,7 @@ function Backup_redo () {
   do
     cp "$file" "${TARGETDIR}"/wal/
   done
-  
+
   Print_log "Redo log files are backed up."
 }
 
@@ -192,9 +206,8 @@ function Backup_wal () {
   local FILE
   # Copy location file
   FILE=$(Cmd_gsql "select property_value from v\$property@local where property_name='LOCATION_FILE';")
-  cp "$FILE" "${TARGETDIR}"/wal/
   
-  if [ "$?" -eq 0 ]
+  if cp "$FILE" "${TARGETDIR}"/wal/
   then
     Print_log "location.ctl is backed up."
   else
@@ -203,9 +216,8 @@ function Backup_wal () {
 
   # Copy commit.log
   WALDIR=$(dirname "$FILE")
-  cp "${WALDIR}"/commit.log "${TARGETDIR}"/wal/
   
-  if [ "$?" -eq 0 ]
+  if cp "${WALDIR}"/commit.log "${TARGETDIR}"/wal/
   then
     Print_log "commit.log is backed up."
   else
@@ -231,13 +243,18 @@ function Print_log () {
 # Create target directory
 if [ ! -d "${TARGETDIR}" ]
 then
-  mkdir -p "${TARGETDIR}"/{conf,db,wal,trc}
+  if mkdir -p "${TARGETDIR}"/{conf,db,wal}
+  then
+    Print_log "[ERROR] mkdir failed."
+    exit 1
+  fi
 fi
 
 Print_log "Backup Start."
 
 # Prepare
 Check_gmaster
+Check_gsql
 Check_archive
 Check_size
 Check_begin
