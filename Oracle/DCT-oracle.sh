@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.05.31 by ashurei
+# Last Update DATE : 2022.08.10 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.05.31.r08"
+SCRIPT_VER="2022.08.10.r02"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -143,7 +143,7 @@ function OScommon () {
   isVM2=$(dmesg | grep "^DMI:" | grep VM | cut -c 6- | cut -d',' -f1)	# for RHEL 5
   if [[ -z "${isVM1}" && -z "${isVM2}" ]]
   then
-	MACHINE_TYPE="Physical"
+    MACHINE_TYPE="Physical"
   else
     MACHINE_TYPE="Unknown"
   fi
@@ -354,13 +354,13 @@ EOF
 
 ### Check sqlplus
 function Check_sqlplus () {
-  local SQLcheck_sqlplus chkSQLPLUS
-  SQLcheck_sqlplus=$(Cmd_sqlplus "${COMMON_VAL}" "select 1 from dual;")
-  chkSQLPLUS=$(echo "${SQLcheck_sqlplus}" | grep -c "ORA-01017")
-  if [ "${chkSQLPLUS}" -ge 1 ]
+  local SQLcheck_sqlplus
+  SQLcheck_sqlplus=$(Cmd_sqlplus "${COMMON_VAL}" "select 1 from dual;" | tr -d "[[:space:]]") 
+  if [ "${SQLcheck_sqlplus}" != 1 ]
   then
-    Print_log "[ERROR] Cannot connect 'sqlplus / as sysdba'. Check sqlnet.ora."
-	Recover_glogin
+    Print_log "[ERROR] Cannot connect 'sqlplus \"/as sysdba\""
+    Print_log "${SQLcheck_sqlplus}"
+    Recover_glogin
     exit 1
   fi
 }
@@ -378,7 +378,7 @@ function Check_version () {
     Print_log "## Oracle USER : ${ORACLE_USER}"
     Print_log "## Oracle HOME : ${ORACLE_HOME}"
     Print_log "## Oracle SID : ${ORACLE_SID}"
-	Recover_glogin
+    Recover_glogin
     exit 1
   fi
 }
