@@ -67,7 +67,7 @@ label linux_cdrom
 label linux_usb
   menu label ^Install RHEL 8.6 custom with USB
   kernel vmlinuz
-  append initrd=initrd.img inst.ks=hd:LABEL=RHEL86:/custom/rhel86_usb.ks quiet
+  append initrd=initrd.img inst.ks=hd:LABEL=RHEL86:/custom/rhel86_usb.ks inst.stage2=hd:LABEL=RHEL86 quiet
 
 label linux
   menu label ^Install Red Hat Enterprise Linux 8.6
