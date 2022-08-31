@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.08.10 by ashurei
+# Last Update DATE : 2022.08.31 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.08.10.r02"
+SCRIPT_VER="2022.08.31.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -371,7 +371,7 @@ function Check_version () {
   ORACLE_VERSION_NUM=$(echo "${ORACLE_VERSION}" | tr -d ".")
   ORACLE_MAJOR_VERSION=$(echo "${ORACLE_VERSION}" | cut -d'.' -f1)
 
-  number='[0-9]'
+  number='^[0-9]+([.][0-9]+)?$'
   if ! [[ "${ORACLE_MAJOR_VERSION}" =~ $number ]]
   then
     Print_log "Error: can't check oracle version. Check oracle environment"
