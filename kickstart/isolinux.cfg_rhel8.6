@@ -66,6 +66,7 @@ label linux_cdrom
 
 label linux_usb
   menu label ^Install RHEL 8.6 custom with USB
+  menu default
   kernel vmlinuz
   append initrd=initrd.img inst.ks=hd:LABEL=RHEL86:/custom/rhel86_usb.ks inst.stage2=hd:LABEL=RHEL86 quiet
 
@@ -88,8 +89,8 @@ label vesa
   menu indent count 5
   menu label Install Red Hat Enterprise Linux 8.6 in ^basic graphics mode
   text help
-        Try this option out if you're having trouble installing
-        Red Hat Enterprise Linux 8.6.
+	Try this option out if you're having trouble installing
+	Red Hat Enterprise Linux 8.6.
   endtext
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=RHEL-8-6-0-BaseOS-x86_64 nomodeset quiet
@@ -98,8 +99,8 @@ label rescue
   menu indent count 5
   menu label ^Rescue a Red Hat Enterprise Linux system
   text help
-        If the system will not boot, this lets you access files
-        and edit config files to try to get it booting again.
+	If the system will not boot, this lets you access files
+	and edit config files to try to get it booting again.
   endtext
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=RHEL-8-6-0-BaseOS-x86_64 inst.rescue quiet
@@ -107,9 +108,9 @@ label rescue
 label memtest
   menu label Run a ^memory test
   text help
-        If your system is having issues, a problem with your
-        system's memory may be the cause. Use this utility to
-        see if the memory is working correctly.
+	If your system is having issues, a problem with your
+	system's memory may be the cause. Use this utility to
+	see if the memory is working correctly.
   endtext
   kernel memtest
 
