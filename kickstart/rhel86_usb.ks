@@ -1,15 +1,15 @@
 ########################################################
 # Description : Kickstart for Redhat Linux 8.6
 # Create DATE : 2022.03.11
-# Last Update DATE : 2022.09.02 by ashurei
+# Last Update DATE : 2022.09.03 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
 text
 #cdrom
 url --url=file:///run/install/repo/BaseOS
-#repo --name=media-BaseOS --baseurl=file:///run/install/repo/BaseOS
 repo --name="AppStream" --baseurl=file:///run/install/repo/AppStream
+
 keyboard --xlayouts='us'
 lang en_US.UTF-8
 network --hostname custom
@@ -20,7 +20,9 @@ timezone Asia/Seoul
 poweroff
 %include /tmp/part-include
 
-%pre --log=/mnt/sysimage/root/ks-pre.log
+
+### Create Partition ============================================================================= #
+%pre --log=/tmp/ks-pre.log
 #!/bin/bash
 BOOTSIZE=2048      # /boot       2GB
 EFISIZE=200        # /boot/efi 200MB
@@ -67,8 +69,20 @@ else
   PartitioningLegacyBoot;
   PartitioningCommon;
 fi
+
 %end
 
+
+### Tasks after partitioned with nochroot ======================================================== #
+%pre-install --log=/mnt/sysroot/root/ks-pre-install.log
+# Copy RPM
+df -hT
+cp -r /run/install/repo/custom/rpm /mnt/sysroot/root/
+chmod 644 /mnt/sysroot/root/rpm/*.rpm
+%end
+
+
+### Install packages ============================================================================= #
 %packages --ignoremissing
 @^minimal-environment
 gcc
@@ -87,9 +101,9 @@ vim-enhanced
 zlib-devel
 %end
 
-%post --log=/root/ks-post.log
 
-# Post-Installation ============================================================================= #
+### Post-Installation ============================================================================= #
+%post --log=/root/ks-post.log
 #!/bin/bash
 ##### /etc/security/limits.conf #####
 cat << EOF >> /etc/security/limits.conf
@@ -111,7 +125,7 @@ sed -i '/^OnCalendar/s/\*\:00\/10/\*\:*\:00/' /usr/lib/systemd/system/sysstat-co
 ##### Local yum repository #####
 #mkdir -p /etc/yum.repos.d/org
 #mv /etc/yum.repos.d/CentOS-* /etc/yum.repos.d/org/
-cat << EOF > /etc/yum.repos.d/local.repo
+cat << EOF > /etc/yum.repos.d/tb-ossrepo.repo
 [local-BaseOS]
 name=Server
 baseurl=file:///mnt/BaseOS
@@ -122,6 +136,18 @@ gpgcheck=0
 name=Server
 baseurl=file:///mnt/AppStream
 enabled=0
+gpgcheck=0
+
+[SKT-TB-RHEL8-baseos]
+name=RHEL-$releasever-baseos
+baseurl=http://60.30.131.100/repos/rhel/8/rhel-8-for-x86_64-baseos-rpms
+enabled=1
+gpgcheck=0
+
+[SKT-TB-RHEL8-appstream]
+name=RHEL-$releasever-appstream
+baseurl=http://60.30.131.100/repos/rhel/8/rhel-8-for-x86_64-appstream-rpms
+enabled=1
 gpgcheck=0
 EOF
 
@@ -139,8 +165,7 @@ EOF
 
 
 ##### Kernel patch #####
-RPMDIR="/run/install/repo/custom/rpm"
-#mount LABEL=RHEL86 /media
+RPMDIR="/root/rpm"
 #rpm -Uvh ${RPMDIR}/kernel-firmware-2.6.32-696.10.2.el6.noarch.rpm
 #rpm -Uvh ${RPMDIR}/dracut-033-572.el7.x86_64.rpm /root/custom/dracut-kernel-004-409.el6_8.2.noarch.rpm
 rpm -ivh ${RPMDIR}/kernel-core-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-modules-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-4.18.0-372.19.1.el8_6.x86_64.rpm
@@ -149,7 +174,7 @@ rpm -Uvh ${RPMDIR}/kernel-headers-4.18.0-372.19.1.el8_6.x86_64.rpm
 rpm -Uvh ${RPMDIR}/kernel-tools-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-tools-libs-4.18.0-372.19.1.el8_6.x86_64.rpm
 
 
-# Security ====================================================================================== #
+# Security #
 
 ##### Set Banner File #####
 cat << EOF > /etc/issue
