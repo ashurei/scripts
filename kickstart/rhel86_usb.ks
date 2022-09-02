@@ -1,16 +1,19 @@
 ########################################################
 # Description : Kickstart for Redhat Linux 8.6
 # Create DATE : 2022.03.11
-# Last Update DATE : 2022.08.29 by ashurei
+# Last Update DATE : 2022.09.02 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
 text
 #cdrom
+url --url=file:///run/install/repo/BaseOS
+#repo --name=media-BaseOS --baseurl=file:///run/install/repo/BaseOS
+repo --name="AppStream" --baseurl=file:///run/install/repo/AppStream
 keyboard --xlayouts='us'
 lang en_US.UTF-8
 network --hostname custom
-rootpw imsi00
+rootpw --plaintext imsi00
 firewall --disabled
 selinux --disabled
 timezone Asia/Seoul
@@ -68,24 +71,19 @@ fi
 
 %packages --ignoremissing
 @^minimal-environment
-ethtool
 gcc
 krb5-devel
-ksh
-lvm2
 man-pages
 man-pages-overrides
 net-tools
-openssh-clients
+#ksh
 openssl-devel
 perl
-rpcbind
-sos
+#rpcbind
+#sos
 sysstat
-unzip
 vim-enhanced
-xinetd
-zip
+#xinetd
 zlib-devel
 %end
 
@@ -114,18 +112,22 @@ sed -i '/^OnCalendar/s/\*\:00\/10/\*\:*\:00/' /usr/lib/systemd/system/sysstat-co
 #mkdir -p /etc/yum.repos.d/org
 #mv /etc/yum.repos.d/CentOS-* /etc/yum.repos.d/org/
 cat << EOF > /etc/yum.repos.d/local.repo
-[media-BaseOS]
-name=media-BaseOS
+[local-BaseOS]
+name=Server
 baseurl=file:///mnt/BaseOS
 enabled=0
 gpgcheck=0
 
-[media-AppStream]
-name=media-AppStream
+[local-AppStream]
+name=Server
 baseurl=file:///mnt/AppStream
 enabled=0
 gpgcheck=0
 EOF
+
+
+##### rhsmd off #####
+#sed -i 's/\/usr/#\/usr/' /etc/cron.daily/rhsmd
 
 
 ##### UseDNS no #####
@@ -137,8 +139,8 @@ EOF
 
 
 ##### Kernel patch #####
-RPMDIR="/media/custom/rpm"
-mount LABEL=RHEL86 /media
+RPMDIR="/run/install/repo/custom/rpm"
+#mount LABEL=RHEL86 /media
 #rpm -Uvh ${RPMDIR}/kernel-firmware-2.6.32-696.10.2.el6.noarch.rpm
 #rpm -Uvh ${RPMDIR}/dracut-033-572.el7.x86_64.rpm /root/custom/dracut-kernel-004-409.el6_8.2.noarch.rpm
 rpm -ivh ${RPMDIR}/kernel-core-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-modules-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-4.18.0-372.19.1.el8_6.x86_64.rpm
@@ -218,23 +220,22 @@ chmod 4750 /bin/su
 
 
 ##### SSH root access configuration #####
-sed -i 's/^#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-sed -i '/PermitEmptyPasswords/ {s/^#//}'             /etc/ssh/sshd_config
+sed -i 's/^PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 #echo "AllowGroups wheel" >> /etc/ssh/sshd_config
 
 
 ##### pam_tally #####
 # system-auth
-SYTEM_AUTH="/etc/pam.d/system-auth"
-sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_time=3600 magic_root' ${SYTEM_AUTH}
-sed -i '10 a\account     required      pam_tally2.so magic_root' ${SYTEM_AUTH}
-sed -i '/pam_faildelay/ {s/^/#/}' ${SYTEM_AUTH}
+#SYTEM_AUTH="/etc/pam.d/system-auth"
+#sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_time=3600 magic_root' ${SYTEM_AUTH}
+#sed -i '10 a\account     required      pam_tally2.so magic_root' ${SYTEM_AUTH}
+#sed -i '/pam_faildelay/ {s/^/#/}' ${SYTEM_AUTH}
 
 # password-auth
-PASSWD_AUTH="/etc/pam.d/password-auth"
-sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_time=3600 magic_root' ${PASSWD_AUTH}
-sed -i '10 a\account     required      pam_tally2.so magic_root' ${PASSWD_AUTH}
-sed -i '/pam_faildelay/ {s/^/#/}' ${PASSWD_AUTH}
+#PASSWD_AUTH="/etc/pam.d/password-auth"
+#sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_time=3600 magic_root' ${PASSWD_AUTH}
+#sed -i '10 a\account     required      pam_tally2.so magic_root' ${PASSWD_AUTH}
+#sed -i '/pam_faildelay/ {s/^/#/}' ${PASSWD_AUTH}
 
 
 ##### kdump settings #####
@@ -255,7 +256,7 @@ EOF
 
 
 ##### /etc/logrotate.conf #####
-sed -i 's/^weekly/monthly/;s/rotate\ 4/rotate\ 12/;s/rotate\ 1$/rotate\ 12/' /etc/logrotate.conf
+sed -i 's/^weekly/monthly/;s/rotate\ 4/rotate\ 12/' /etc/logrotate.conf
 sed -i 's/0664/0600/' /etc/logrotate.conf
 
 exit
