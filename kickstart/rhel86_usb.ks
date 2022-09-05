@@ -2,7 +2,7 @@
 # Description : Kickstart for Redhat Linux 8.6
 # Create DATE : 2022.03.11
 # Last Update DATE : 2022.09.03 by ashurei
-# Copyright (c) ashurei@sktelecom.com, 2021
+# Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
 text
@@ -24,6 +24,7 @@ poweroff
 ### Create Partition ============================================================================= #
 %pre --log=/tmp/ks-pre.log
 #!/bin/bash
+DISK="sda"
 BOOTSIZE=2048      # /boot       2GB
 EFISIZE=200        # /boot/efi 200MB
 ROOTSIZE=153600    # /         150GB
@@ -40,17 +41,17 @@ GatherSizing() {
 }
 Clearing () {
   echo "zerombr" >> /tmp/part-include
-  echo "ignoredisk --only-use sda" >> /tmp/part-include
+  echo "ignoredisk --only-use ${DISK}" >> /tmp/part-include
   echo "clearpart --initlabel --all" >> /tmp/part-include
 }
 PartitioningEfiBoot () {
-  echo "bootloader --location partition --driveorder sda" >> /tmp/part-include
+  echo "bootloader --location partition --driveorder ${DISK}" >> /tmp/part-include
   echo "part /boot --fstype xfs --size $BOOTSIZE --asprimary" >> /tmp/part-include
   echo "part /boot/efi --fstype vfat --size $EFISIZE --asprimary" >> /tmp/part-include
   echo "part swap --fstype swap --size $SWAPSIZE" >> /tmp/part-include
 }
 PartitioningLegacyBoot () {
-  echo "bootloader --location mbr --driveorder sda" >> /tmp/part-include
+  echo "bootloader --location mbr --driveorder ${DISK}" >> /tmp/part-include
   echo "part /boot --fstype xfs --size $BOOTSIZE --asprimary" >> /tmp/part-include
   echo "part swap --fstype swap --size $SWAPSIZE --asprimary" >> /tmp/part-include
 }
@@ -69,16 +70,16 @@ else
   PartitioningLegacyBoot;
   PartitioningCommon;
 fi
-
 %end
 
 
 ### Tasks after partitioned with nochroot ======================================================== #
 %pre-install --log=/mnt/sysroot/root/ks-pre-install.log
 # Copy RPM
+TARGET="/mnt/sysroot/root"
 df -hT
-cp -r /run/install/repo/custom/rpm /mnt/sysroot/root/
-chmod 644 /mnt/sysroot/root/rpm/*.rpm
+cp -r /run/install/repo/custom/rpm ${TARGET}/
+chmod 644 ${TARGET}/rpm/*.rpm
 %end
 
 
