@@ -1,12 +1,12 @@
-#!/bin/bash
+!/bin/bash
 ########################################################
 # Description : Goldilocks Hot Backup
 # Create DATE : 2022.07.13
-# Last Update DATE : 2022.08.08 by ashurei
+# Last Update DATE : 2022.09.30 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.08.08.r05"
+SCRIPT_VER="2022.09.30.r04"
 TODAY=$(date '+%Y%m%d')
 BACKDIR="/goldilocks/backup"
 TARGETDIR="${BACKDIR}/${TODAY}"
@@ -81,7 +81,7 @@ function Get_cluster_member_name () {
 
 ### Check file size
 function Check_size () {
-  local file FILES SUM SIZE
+  local file FILES SUM SIZE number
   # Check filesystem size
   SPACE=$(df -k "${TARGETDIR}" | tail -1 | awk '{print $4}')
   Print_log "${TARGETDIR} available size : $((SPACE/1024/1024))GB"
@@ -89,10 +89,14 @@ function Check_size () {
   FILES=$(Cmd_gsql "select file_name from v\$db_file where file_type in ('Config File', 'Data File','Redo Log File');")
 
   SUM=0
+  number='^[0-9]+([.][0-9]+)?$'
   for file in $FILES
   do
-    SIZE=$(stat -c%s "$file")
-    SUM=$((SUM + SIZE))
+    SIZE=$(stat -c%s "$file" 2>&1)
+    if [[ "${SIZE}" =~ $number ]]
+    then
+      SUM=$((SUM + SIZE))
+    fi
   done
 
   Print_log "The size of backup files is $((SUM/1024/1024/1024))GB."
@@ -124,7 +128,7 @@ function Get_datafile () {
 ### Delete old backup
 function Delete_backup () {
   # Delete old backup
-  find ${BACKDIR:?} -mtime +2 -type d -regextype posix-extended -regex "${BACKDIR}/[0-9]{8}" -print0 | xargs -0 rm -r
+  find ${BACKDIR:?} -mtime +0 -type d -regextype posix-extended -regex "${BACKDIR}/[0-9]{8}" -print0 | xargs -0 rm -r >/dev/null 2>&1
   # Delete old logs
   find ${BACKDIR:?}/Backup_goldilocks_*.log -mtime +7 -type f -delete 2>&1
 }
@@ -149,7 +153,10 @@ function Backup_config () {
 
   for file in $FILES
   do
-    cp "$file" "${TARGETDIR}"/conf/
+    if ! cp "$file" "${TARGETDIR}"/conf/ >/dev/null 2>&1
+    then
+      Print_log "cp $file is failed."
+    fi
   done
 }
 
@@ -172,19 +179,22 @@ function Backup_datafile () {
   do
     # Begin backup
     Cmd_gsql "alter tablespace $tbs begin backup at ${DBNAME};" "--silent"
-        Print_log "alter tablespace $tbs begin backup at ${DBNAME};"
+    Print_log "alter tablespace $tbs begin backup at ${DBNAME};"
 
     # Copy files
     FILES=$(Get_datafile "$tbs")
     for file in $FILES
     do
-      cp "$file" "${TARGETDIR}"/db/
+      if ! cp "$file" "${TARGETDIR}"/db/ >/dev/null 2>&1
+      then
+        Print_log "cp $file is failed."
+      fi
       #echo "$file"
     done
 
     # End backup
     Cmd_gsql "alter tablespace $tbs end backup at ${DBNAME};" "--silent"
-        Print_log "alter tablespace $tbs end backup at ${DBNAME};"
+    Print_log "alter tablespace $tbs end backup at ${DBNAME};"
   done
 }
 
@@ -195,7 +205,10 @@ function Backup_redo () {
 
   for file in $FILES
   do
-    cp "$file" "${TARGETDIR}"/wal/
+    if ! cp "$file" "${TARGETDIR}"/wal/ >/dev/null 2>&1
+    then
+      Print_log "cp $file is failed."
+    fi
   done
 
   Print_log "Redo log files are backed up."
@@ -206,7 +219,7 @@ function Backup_wal () {
   local FILE
   # Copy location file
   FILE=$(Cmd_gsql "select property_value from v\$property@local where property_name='LOCATION_FILE';")
-  
+
   if cp "$FILE" "${TARGETDIR}"/wal/
   then
     Print_log "location.ctl is backed up."
@@ -216,7 +229,7 @@ function Backup_wal () {
 
   # Copy commit.log
   WALDIR=$(dirname "$FILE")
-  
+
   if cp "${WALDIR}"/commit.log "${TARGETDIR}"/wal/
   then
     Print_log "commit.log is backed up."
@@ -243,7 +256,7 @@ function Print_log () {
 # Create target directory
 if [ ! -d "${TARGETDIR}" ]
 then
-  if mkdir -p "${TARGETDIR}"/{conf,db,wal}
+  if ! mkdir -p "${TARGETDIR}"/{conf,db,wal}
   then
     Print_log "[ERROR] mkdir failed."
     exit 1
