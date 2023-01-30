@@ -1,4 +1,6 @@
-# Crontab 구성
+# Crontab 구성 가이드
+
+Script 경로는 계정명에 따라 수정. 여기서는 oracle 과 grid 로 가정함.
 
 ## Oracle 계정
 ```
