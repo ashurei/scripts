@@ -2,7 +2,7 @@
 
 ## Oracle 계정
 
-`#Manage log of Oracle (ashurei@sk.com)
+`#Manage log of Oracle (ashurei@sk.com)`
 20 01 * * * /home/oracle/DBA/script/ManagerLog-oracle.sh
 
 Manager archive log (ashurei@sk.com) (only node#2)
