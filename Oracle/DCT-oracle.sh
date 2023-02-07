@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2022.08.31 by ashurei
+# Last Update DATE : 2023.02.07 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2022.08.31.r01"
+SCRIPT_VER="2023.02.07.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -340,6 +340,15 @@ function OSmultipath () {
     else
       echo "There is no multipath config."
     fi
+  } >> "${OUTPUT}" 2>&1
+}
+
+### crontab
+function OScrontab () {
+  { # Insert to output file
+    echo $recsep
+    echo "##@ OScrontab"
+	crontab -l
   } >> "${OUTPUT}" 2>&1
 }
 
@@ -2390,6 +2399,7 @@ do
   OSchrony
   OSnsswitch
   OSmultipath
+  OScrontab
   
   Check_sqlplus
   Check_version
