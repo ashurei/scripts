@@ -1,17 +1,23 @@
-!/bin/bash
+#!/bin/bash
 ########################################################
 # Description : Goldilocks Hot Backup
 # Create DATE : 2022.07.13
-# Last Update DATE : 2022.09.30 by ashurei
+# Last Update DATE : 2023.02.09 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2022.09.30.r04"
+SCRIPT_VER="2023.02.09.r05"
 TODAY=$(date '+%Y%m%d')
-BACKDIR="/goldilocks/backup"
+
+#######################################################
+# Need to modify
+export GOLDILOCKS_HOME="/home/sunje/goldilocks_home"
+export GOLDILOCKS_DATA="/home/sunje/goldilocks_data"
+BACKDIR="/workspace/backup"
+PASSWORD="SKTelecom!2#4"
+#######################################################
+
 TARGETDIR="${BACKDIR}/${TODAY}"
-WHOAMI=$(whoami)
-GSQL="gsql sys SKTelecom!2#4 --dsn GOLDILOCKS --no-prompt"
 COMMON="
 \set linesize 300
 \set heading off
@@ -22,6 +28,8 @@ COMMON="
 # ========== Functions ========== #
 ### Get Goldilocks result with sqlplus
 function Cmd_gsql () {
+  local GSQL
+  GSQL="${GOLDILOCKS_HOME}/bin/gsql sys ${PASSWORD} --dsn GOLDILOCKS --no-prompt"
   ${GSQL} "$2" << EOF | sed '/^$/d' | grep -v " selected."
 ${COMMON}
 $1
@@ -44,7 +52,8 @@ function Check_gsql () {
 ### Check gmaster process
 function Check_gmaster () {
   local CHK
-  CHK=$(ps aux | grep -w "${WHOAMI}" | grep gmaster)
+  CHK=$(pgrep -U "$(whoami)" gmaster)
+  # $CHK is not null
   if [ -z "${CHK}" ]
   then
     Print_log "[ERROR] There is not goldilocks process."
@@ -56,6 +65,7 @@ function Check_gmaster () {
 function Check_archive () {
   local CHK
   CHK=$(Cmd_gsql "select archivelog_mode as mode from v\$archivelog;")
+  # no archive log mode
   if [ "${CHK}" == "NOARCHIVELOG" ]
   then
     Print_log "[ERROR] Hot backup needs 'ARCHIVELOG' mode."
@@ -135,7 +145,8 @@ function Delete_backup () {
 
 ### Backup controlfile
 function Backup_controlfile () {
-  CTRL="${TARGETDIR}/control_backup_${TODAY}.ctl"
+  local CTRL
+  CTRL="${TARGETDIR}/conf/control_backup_${TODAY}.ctl"
   Cmd_gsql "alter database backup controlfile to '${CTRL}';" "--silent"
 
   if [ -f "${CTRL}" ]
