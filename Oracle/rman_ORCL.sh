@@ -2,7 +2,7 @@
 ########################################################
 # Description : Rman Backup Script
 # Create DATE : 2023.02.06
-# Last Update DATE : 2023.03.28 by ashurei
+# Last Update DATE : 2023.04.12 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
@@ -37,9 +37,10 @@ find ${LOGDIR:?}/rman_"${ORACLE_SID}"_*.log -mtime +30 -type f -delete 2>&1
 ### rman backup
 "${ORACLE_HOME}"/bin/rman target / > "${RMANLOG}" << EOF
 run {
-  configure retention policy to recovery window of 3 days;
+  configure retention policy to redundancy 2;
   configure controlfile autobackup on;
   configure controlfile autobackup format for device type disk to '${BACKDIR}/autobackup_%F.ctl';
+  configure snapshot controlfile name to '+ARCH/RTS/CONTROLFILE/snapcf_${ORACLE_SID}.f';
 
   allocate channel dch1 device type disk format '${BACKDIR}/%d_%U_%T' maxopenfiles 1;
   allocate channel dch2 device type disk format '${BACKDIR}/%d_%U_%T' maxopenfiles 1;
