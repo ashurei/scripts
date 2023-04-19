@@ -1,8 +1,8 @@
 ########################################################
 # Description : Kickstart for Rocky Linux 8.7
 # Create DATE : 2022.03.11
-# Last Update DATE : 2022.12.13 by ashurei
-# Copyright (c) ashurei@sktelecom.com, 2022
+# Last Update DATE : 2023.04.19 by ashurei
+# Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
 text
@@ -76,10 +76,12 @@ man-pages-overrides
 net-tools
 #ksh
 openssl-devel
+pciutils
 perl
 #rpcbind
 #sos
 sysstat
+tar
 vim-enhanced
 #xinetd
 zlib-devel
