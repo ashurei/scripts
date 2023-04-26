@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Rocky Linux 8.7
 # Create DATE : 2022.03.11
-# Last Update DATE : 2023.04.19 by ashurei
+# Last Update DATE : 2023.04.26 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
@@ -190,6 +190,7 @@ sed -i 's/shutdown/#shutdown/' /etc/passwd
 sed -i 's/operator/#operator/' /etc/passwd
 sed -i 's/sync/#sync/'         /etc/passwd
 sed -i 's/halt/#halt/'         /etc/passwd
+sed -i 's/ftp/#ftp/'           /etc/passwd
 
 
 ##### Add "suser" #####
@@ -201,10 +202,10 @@ echo -e 'suser\tALL=(ALL)\tNOPASSWD:ALL' > /etc/sudoers.d/suser
 ##### Passwd policy with /etc/login.defs #####
 # PASS_MAX_DAYS   70
 # PASS_MIN_DAYS   7
-# PASS_MIN_LEN    8
+# PASS_MIN_LEN    10
 sed -i '/^PASS_MAX_DAYS/ {s/[0-9]\{1,\}/70/}' /etc/login.defs
-sed -i '/^PASS_MIN_DAYS/ {s/[0-9]\{1,\}/7/}' /etc/login.defs
-sed -i '/^PASS_MIN_LEN/  {s/[0-9]\{1,\}/8/}' /etc/login.defs
+sed -i '/^PASS_MIN_DAYS/ {s/[0-9]\{1,\}/7/}'  /etc/login.defs
+sed -i '/^PASS_MIN_LEN/  {s/[0-9]\{1,\}/10/}' /etc/login.defs
 echo SULOG_FILE /var/log/sulog >> /etc/login.defs
 
 
@@ -226,25 +227,22 @@ chmod 640 /etc/rsyslog.conf
 #chown -R root. /var/log/cups
 chown root.wheel /bin/su
 chmod 4750 /bin/su
+chmod -s /usr/bin/newgrp
+chmod -s /sbin/unix_chkpwd
 
 
 ##### SSH root access configuration #####
 sed -i 's/^PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i '/PermitEmptyPasswords/ {s/^#//}'            /etc/ssh/sshd_config
 #echo "AllowGroups wheel" >> /etc/ssh/sshd_config
 
 
 ##### pam_tally #####
-# system-auth
-#SYTEM_AUTH="/etc/pam.d/system-auth"
-#sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_time=3600 magic_root' ${SYTEM_AUTH}
-#sed -i '10 a\account     required      pam_tally2.so magic_root' ${SYTEM_AUTH}
-#sed -i '/pam_faildelay/ {s/^/#/}' ${SYTEM_AUTH}
-
-# password-auth
-#PASSWD_AUTH="/etc/pam.d/password-auth"
-#sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_time=3600 magic_root' ${PASSWD_AUTH}
-#sed -i '10 a\account     required      pam_tally2.so magic_root' ${PASSWD_AUTH}
-#sed -i '/pam_faildelay/ {s/^/#/}' ${PASSWD_AUTH}
+# /etc/pam.d/su
+sed -i '/#auth\t\trequired\tpam_wheel.so/ {s/#auth/auth/}' /etc/pam.d/su
+# /etc/pam.d/login
+echo -e "auth\trequired\tpam_securetty.so" >> /etc/pam.d/login
+touch /etc/securetty
 
 
 ##### kdump settings #####
@@ -255,10 +253,11 @@ sed -i '/^core_collector/ {s/-l/-c/}' /etc/kdump.conf
 cat << EOF >> /etc/profile
 
 # Added for SKT
-umask 0022
+umask 022
 export HISTSIZE=5000
 export HISTTIMEFORMAT='%F %T '
-export TMOUT=300
+TMOUT=900
+export TMOUT
 set -o vi
 alias vi='vim'
 EOF
@@ -266,7 +265,7 @@ EOF
 
 ##### /etc/logrotate.conf #####
 sed -i 's/^weekly/monthly/;s/rotate\ 4/rotate\ 12/' /etc/logrotate.conf
-sed -i 's/0664/0600/' /etc/logrotate.conf
+sed -i 's/0664/0600/'                               /etc/logrotate.conf
 
 exit
 %end
