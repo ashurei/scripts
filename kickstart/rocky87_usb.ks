@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Rocky Linux 8.7
 # Create DATE : 2022.03.11
-# Last Update DATE : 2023.04.26 by ashurei
+# Last Update DATE : 2023.05.22 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
