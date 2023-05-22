@@ -124,30 +124,17 @@ baseurl=file:///mnt/AppStream
 enabled=0
 gpgcheck=0
 
-[SKT-TB-RHEL8-baseos]
-name=RHEL8-baseos
-baseurl=http://60.30.131.100/repos/rhel/8/rhel-8-for-x86_64-baseos-rpms
+[SKT-TB-ROCKY8-baseos]
+name=Rocky-BaseOS
+baseurl=http://60.30.131.100/repos/rocky/8/BaseOS/x86_64/os
 enabled=1
 gpgcheck=0
 
-[SKT-TB-RHEL8-appstream]
-name=RHEL8-appstream
-baseurl=http://60.30.131.100/repos/rhel/8/rhel-8-for-x86_64-appstream-rpms
+[SKT-TB-ROCKY8-appstream]
+name=Rocky-AppStream
+baseurl=http://60.30.131.100/repos/rocky/8/AppStream/x86_64/os
 enabled=1
 gpgcheck=0
-EOF
-
-
-##### rhsmd off #####
-#sed -i 's/\/usr/#\/usr/' /etc/cron.daily/rhsmd
-
-
-##### UseDNS no #####
-#sed -i 's/\#UseDNS yes/UseDNS no/' /etc/ssh/sshd_config
-
-
-##### Loopback network #####
-#echo "MTU=1500" >> /etc/sysconfig/network-scripts/ifcfg-lo
 
 
 ##### Kernel patch #####
@@ -158,8 +145,7 @@ RPMDIR="/root/rpm"
 #rpm -Uvh ${RPMDIR}/kernel-tools-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-tools-libs-4.18.0-372.19.1.el8_6.x86_64.rpm
 
 
-# Security #
-
+# [ Security ]
 ##### Set Banner File #####
 cat << EOF > /etc/issue
  #####################################################################
@@ -209,15 +195,6 @@ sed -i '/^PASS_MIN_LEN/  {s/[0-9]\{1,\}/10/}' /etc/login.defs
 echo SULOG_FILE /var/log/sulog >> /etc/login.defs
 
 
-##### FTP configuration #####
-ISFTP=$(rpm -q vsftpd | grep -E 'vsftpd-[0-9]')
-if [ -n "${ISFTP}" ]
-then
-  sed -i '/anonymous_enable/ {s/YES/NO/}' /etc/vsftpd/vsftpd.conf
-  sed -i 's/#ftpd_banner=Welcome to blah FTP service/ftpd_banner=WARNING:Authorized use only/' /etc/vsftpd/vsftpd.conf
-fi
-
-
 ##### Permission #####
 touch /etc/hosts.equiv
 chmod 000 /etc/hosts.equiv
@@ -231,13 +208,14 @@ chmod -s /usr/bin/newgrp
 chmod -s /sbin/unix_chkpwd
 
 
-##### SSH root access configuration #####
+##### SSH configuration #####
+#sed -i 's/\#UseDNS yes/UseDNS no/' /etc/ssh/sshd_config
 sed -i 's/^PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i '/PermitEmptyPasswords/ {s/^#//}'            /etc/ssh/sshd_config
 #echo "AllowGroups wheel" >> /etc/ssh/sshd_config
 
 
-##### pam_tally #####
+##### pam_tally (RHEL 8) #####
 # /etc/pam.d/su
 sed -i '/#auth\t\trequired\tpam_wheel.so/ {s/#auth/auth/}' /etc/pam.d/su
 # /etc/pam.d/login
