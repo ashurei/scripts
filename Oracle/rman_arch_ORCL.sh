@@ -2,7 +2,7 @@
 ########################################################
 # Description : Rman Archive log Backup Script
 # Create DATE : 2023.02.06
-# Last Update DATE : 2023.04.12 by ashurei
+# Last Update DATE : 2023.06.02 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
@@ -37,7 +37,6 @@ find ${LOGDIR:?}/rman_arch_"${ORACLE_SID}"_*.log -mtime +30 -type f -delete 2>&1
 ### rman backup
 "${ORACLE_HOME}"/bin/rman target / > "${RMANLOG}" << EOF
 run {
-  configure retention policy to recovery window of 5 days;
   configure snapshot controlfile name to '+ARCH/RTS/CONTROLFILE/snapcf_${ORACLE_SID}.f';
   crosscheck backup of archivelog all;
   backup tag='${ORACLE_SID}_ARCH' format '${BACKDIR}/ARCH_%d_%U_%T'
