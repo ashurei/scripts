@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Rocky Linux 8
 # Create DATE : 2022.03.11
-# Last Update DATE : 2023.05.22 by ashurei
+# Last Update DATE : 2023.06.26 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
@@ -28,7 +28,8 @@ BOOTSIZE=2048      # /boot       2GB
 EFISIZE=200        # /boot/efi 200MB
 ROOTSIZE=153600    # /         150GB
 
-GatherSizing() {
+# Gather size for SWAP
+function GatherSizing() {
   MEM_MB=$(grep MemTotal /proc/meminfo | awk '{printf("%d"), $2/1024}')
   # swap (Max 8GB)
   if [ ${MEM_MB} -le 2048 ]
@@ -39,23 +40,26 @@ GatherSizing() {
   fi
 }
 
-GatherSizing;
-echo "zerombr" > /tmp/part-include
-echo "ignoredisk --only-use=sda" >> /tmp/part-include
-echo "clearpart --all --initlabel" >> /tmp/part-include
-echo "bootloader --location=mbr --driveorder=sda" >> /tmp/part-include
-echo "part /boot --fstype=xfs --size=$BOOTSIZE" >> /tmp/part-include
+# Get disk for install bootloader (Against USB is mounted to /dev/sda)
+DISK=$(blkid | grep -Ev 'loop|mapper|run|vfat' | awk -F'/|:' '{print $3}' | sed 's/[^a-z]//g' | sort | head -1)
 
+GatherSizing
+echo "zerombr" > /tmp/part-include
+echo "ignoredisk --only-use=${DISK}" >> /tmp/part-include
+echo "clearpart --all --initlabel" >> /tmp/part-include
+echo "bootloader --location=mbr --driveorder=${DISK}" >> /tmp/part-include
+echo "part /boot --fstype=xfs --size=${BOOTSIZE}" >> /tmp/part-include
+
+# Check EFI mode
 if [ -d "/sys/firmware/efi" ]
 then
-  echo "part /boot/efi --fstype=efi --size=$EFISIZE" >> /tmp/part-include
+  echo "part /boot/efi --fstype=efi --size=${EFISIZE}" >> /tmp/part-include
 fi
 
-echo "part swap --fstype=swap --size=$SWAPSIZE" >> /tmp/part-include
-echo "part / --fstype=xfs --size=$ROOTSIZE" >> /tmp/part-include
+echo "part swap --fstype=swap --size=${SWAPSIZE}" >> /tmp/part-include
+echo "part / --fstype=xfs --size=${ROOTSIZE}" >> /tmp/part-include
 
 %end
-
 
 ### Tasks after partitioned with nochroot ======================================================== #
 %pre-install --logfile=/mnt/sysroot/root/ks-pre-install.log
