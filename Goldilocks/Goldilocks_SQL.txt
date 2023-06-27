@@ -1,0 +1,271 @@
+-- config 파일 경로
+$GOLDILOCKS_DATA/conf/goldilocks.properties.conf
+
+-- gsql default 계정 정보
+gsql sys gliese --as sysdba
+
+-- 바로 직전 SQL 재수행
+\\
+
+-- SQL history 조회
+\hi[story]
+
+\set linesize 200
+\set pagesize 1000
+
+\connect test test
+\connect sys gliese as sysdba
+
+
+-- Dictionary 조회
+select table_name from dict;
+select table_name from dictionary;
+
+-- 성능 뷰 리스트 확인
+select table_name, startup_phase from v$tables order by 1;
+
+-- instance 상태 조회
+select * from gv$instance;
+select * from v$instance;
+
+-- cluster 상태 조회
+select * from tech_cluster;
+
+
+[PROPERTY]
+-- v$property 조회 (parameter)
+select	property_name
+	  , property_value
+	  , value_unit
+	  , init_value
+from v$property@local
+where property_name like '%ARCH%';
+
+alter system set PROCESS_MAX_COUNT=1000 scodpe=file;
+alter system set CDISPATCHER_HOT_POLICY_INTERVAL=100 scope=both;
+	==> scope=both 로 수행할 경우 goldilocks.propertiesconf.binary 파일이 생성되며 이 파일을 먼저 읽어올라온다.
+alter system set CLUSTER_SPLIT_BRAIN_RESOLUTION_POLICY=2;
+
+
+-- hidden parameter 조회
+select	property_name
+ 	  , value
+ 	  , init_value
+ 	  , min
+ 	  , max
+ from x$property@local
+where property_name like '%CDC%';
+
+alter system set DISABLE_DDL_CDC_GIVEUP=NO;
+alter system set DISABLE_DDL_CDC_GIVEUP='NO' at g1n1;
+1
+[USER]
+-- dba_users
+select	username,
+		default_tablespace,
+		temporary_tablespace,
+		index_tablespace,
+		created
+  from dba_users
+ order by 1;
+
+
+[FILE]
+-- tablespace
+select * from v$tablespace;
+select * from tech_tablespace;
+
+-- datafile
+select tbs_name
+     , datafile_name
+	 , file_size/1024/1024 "size(MB)"
+from v$datafile;
+
+
+-- logfile
+select * from gv$logfile;
+select * from v$logfile;
+
+
+[SESSION]
+-- session
+set linesize 200
+select session_id
+      ,serial_no
+	  ,trans_id
+	  ,user_name
+	  ,session_status
+	  ,server_type
+	  ,os_user_name
+	  ,logon_time
+	  ,program_name
+	  ,client_address
+	  ,failover_type
+	  ,failed_over
+from  v$session
+where user_name not in ('SYS','null');
+
+-- client_address 와 program_name grouping
+select client_address
+     , os_user_name
+     , program_name
+	 , count(*)
+from gv$session
+where user_name not in ('SYS','null')
+group by client_address, os_user_name, program_name;
+
+
+-- archive
+select * from v$archivelog;
+
+
+-- system status
+select * from v$system_event;
+select * from v$system_mem_stat;
+select * from v$system_sql_stat;
+select * from v$system_stat;
+
+-- wait event 에 대한 설명
+select name, description from v$wait_event_name;
+
+
+-- transaction
+select * from v$transaction;
+
+
+
+
+-- DDL 구문 추출 (매뉴얼 p.3201)
+\ddl_tablespace [tablespace명] 			: tablespace 관련 구문 전부 표시
+\ddl_tablespace [tablespace명] create	: tablespace 생성 구문 표시
+\ddl_table [table명] create				: table 생성 구문 표시
+
+
+
+
+-- 실행 플랜 조회
+\explain plan		: 1회성
+\set autotrace on	: 세션 종료까지 유지
+
+
+
+
+
+
+### gloader
+-- control file
+Table 이름
+Schema 이름
+Introduction | 3,299
+Row의 Column간의 구분자
+Column 데이터의 시작과 끝을 알리는 Qualifier
+Row간의 구분자
+Character set
+공백문자에 대한 Trim 여부
+Where 절
+
+
+-- Test
+$ cat test.ctl
+TABLE t1
+FIELDS TERMINATED BY ','
+OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+
+$ cat test.sql
+CREATE TABLE t1
+(
+	TEST_NAME VARCHAR(60),
+	TEST_NUM INTEGER,
+	TEST_TIME TIMESTAMP(0) WITH TIME ZONE
+);
+INSERT INTO t1 VALUES ( 'NAME', 1, '1999-01-08 04:05:06.789 -8:00' );
+INSERT INTO t1 VALUES ( 'NAME', 2, '1999-01-08 04:05:06.789 -8:00' );
+INSERT INTO t1 VALUES ( 'NAME', 3, '1999-01-08 04:05:06.789 -8:00' );
+COMMIT;
+
+$ gsql test test --import 'test.sql'
+
+$ gloader test test --export --control test.ctl --data test.dat --no-copyright
+
+$ cp test.dat import.dat
+$ gloader test test --import --control test.ctl --data import.dat --no-copyright
+	==> 기존 테이블에 append 됨. (총 6건)
+
+
+
+
+
+
+[2021/07/13]
+### Goldilocks 제공 script 경로
+$GOLDILOCKS_HOME/script
+tech_cluster.sql
+tech_index.sql
+tech_lockwait.sql
+tech_logbuffer.sql
+tech_sequence.sql
+tech_session_psa.sql
+tech_session_wait_event.sql
+tech_statement.sql
+tech_system_wait_event.sql
+tech_tablespace.sql
+tech_table.sql
+tech_transaction.sql
+tech_unused_col.sql
+tech_user.sql
+
+ ==> performance view 를 생성해주는 SQL
+
+gsql sys gliese -i tech_cluster.sql
+
+
+
+
+
+
+
+
+
+
+select * from tech_cluster;
+select * from tech_tablespace;
+
+-- queue 가 부족한지 알아보기 위해서는 아래 view 의 wait_count 컬럼을 조회
+select * from x$cluster_queue;
+
+select * from v$lock_wait@local;
+select name, value from x$sql_system_info@local;
+
+select * from v$system_event;
+select * from v$wait_event_name where wait_event_id = '33';
+
+select id, stmt_type, sum(execute_count) ex_count
+from x$sql_sess_stat_exec_stmt@local
+group by id, stmt_type
+order by 3;
+
+	==> DB 구동된 이후의 전체 통계인지? 구간을 조건으로 줄 수 있는지?
+
+
+[ memory 사용률 조회 ]
+select * from x$dynamic_mem where seq_id = 0;
+
+-- local node
+select round(TOTAL_SIZE/1024/1024,2) "TOTAL_SIZE(MB)"
+     , round(USED_SIZE/1024/1024,2)  "USED_SIZE(MB)"
+	 , round(TOTAL_HIGH_MARK/1024/1024,2) "TOTAL_HIGH(MB)"
+	 , round(USED_HIGH_MARK/1024/1024,2) "USED_HIGH(MB)"
+	 , desc
+from x$dynamic_mem@local
+where seq_id = 0;
+
+-- all node
+select round(TOTAL_SIZE/1024/1024,2) "TOTAL_SIZE(MB)"
+     , round(USED_SIZE/1024/1024,2)  "USED_SIZE(MB)"
+	 , round(TOTAL_HIGH_MARK/1024/1024,2) "TOTAL_HIGH(MB)"
+	 , round(USED_HIGH_MARK/1024/1024,2) "USED_HIGH(MB)"
+	 , desc
+from x$dynamic_mem
+where seq_id = 0;
+
