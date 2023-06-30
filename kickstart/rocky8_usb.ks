@@ -139,6 +139,7 @@ name=Rocky-AppStream
 baseurl=http://60.30.131.100/repos/rocky/8/AppStream/x86_64/os
 enabled=1
 gpgcheck=0
+EOF
 
 
 ##### Kernel patch #####
