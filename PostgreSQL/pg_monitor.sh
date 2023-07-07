@@ -13,7 +13,7 @@ export PGPORT=5444
 DATE=$(date "+%Y%m%d")
 DATE_S=$(date '+%Y-%m-%d %H:%M:%S')
 LOGDIR="$HOME/script/log"
-LOGFILE="${LOGDIR}/pg_session_${DATE}.log"
+LOGFILE="${LOGDIR}/pg_monitor_${DATE}.log"
 if [ ! -d "$LOGDIR" ]
 then
   mkdir -p "$LOGDIR"
