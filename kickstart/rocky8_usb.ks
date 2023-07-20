@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Rocky Linux 8
 # Create DATE : 2022.03.11
-# Last Update DATE : 2023.06.26 by ashurei
+# Last Update DATE : 2023.07.20 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
@@ -42,6 +42,11 @@ function GatherSizing() {
 
 # Get disk for install bootloader (Against USB is mounted to /dev/sda)
 DISK=$(blkid | grep -Ev 'loop|mapper|run|vfat' | awk -F'/|:' '{print $3}' | sed 's/[^a-z]//g' | sort | head -1)
+# If $DISK is null set "sda"
+if [ -z "$DISK" ]
+then
+  DISK="sda"
+fi
 
 GatherSizing
 echo "zerombr" > /tmp/part-include
@@ -65,8 +70,8 @@ echo "part / --fstype=xfs --size=${ROOTSIZE}" >> /tmp/part-include
 %pre-install --logfile=/mnt/sysroot/root/ks-pre-install.log
 # Copy RPM
 df -hT
-#cp -r /run/install/repo/custom/rpm /mnt/sysroot/root/
-#chmod 644 /mnt/sysroot/root/rpm/*.rpm
+cp -r /run/install/repo/custom/rpm /mnt/sysroot/root/
+chmod 644 /mnt/sysroot/root/rpm/*.rpm
 %end
 
 
@@ -144,10 +149,10 @@ EOF
 
 ##### Kernel patch #####
 RPMDIR="/root/rpm"
-#rpm -ivh ${RPMDIR}/kernel-core-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-modules-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-4.18.0-372.19.1.el8_6.x86_64.rpm
+rpm -ivh ${RPMDIR}/kernel-core-4.18.0-477.15.1.el8_8.x86_64.rpm ${RPMDIR}/kernel-modules-4.18.0-477.15.1.el8_8.x86_64.rpm ${RPMDIR}/kernel-4.18.0-477.15.1.el8_8.x86_64.rpm
 #rpm -ivh ${RPMDIR}/kernel-devel-4.18.0-372.19.1.el8_6.x86_64.rpm
-#rpm -Uvh ${RPMDIR}/kernel-headers-4.18.0-372.19.1.el8_6.x86_64.rpm
-#rpm -Uvh ${RPMDIR}/kernel-tools-4.18.0-372.19.1.el8_6.x86_64.rpm ${RPMDIR}/kernel-tools-libs-4.18.0-372.19.1.el8_6.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-headers-4.18.0-477.15.1.el8_8.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-tools-4.18.0-477.15.1.el8_8.x86_64.rpm ${RPMDIR}/kernel-tools-libs-4.18.0-477.15.1.el8_8.x86_64.rpm
 
 
 # [ Security ]
