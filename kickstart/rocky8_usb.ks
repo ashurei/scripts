@@ -240,7 +240,7 @@ sed -i '/^core_collector/ {s/-l/-c/}' /etc/kdump.conf
 ##### /etc/profile #####
 # Comment umask line
 UMASK=$(grep -n "if \[ \$UID -gt 199 \]" /etc/profile | cut -d':' -f1)
-for line in $(seq 59 63)
+for line in $(seq ${UMASK} $((UMASK+4)))
 do
   sed -i "${line}s/^/#/" /etc/profile
 done
