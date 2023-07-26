@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Rocky Linux 8
 # Create DATE : 2022.03.11
-# Last Update DATE : 2023.07.20 by ashurei
+# Last Update DATE : 2023.07.26 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
@@ -238,6 +238,14 @@ sed -i '/^core_collector/ {s/-l/-c/}' /etc/kdump.conf
 
 
 ##### /etc/profile #####
+# Comment umask line
+UMASK=$(grep -n "if \[ \$UID -gt 199 \]" /etc/profile | cut -d':' -f1)
+for line in $(seq 59 63)
+do
+  sed -i "${line}s/^/#/" /etc/profile
+done
+
+# Add configuration
 cat << EOF >> /etc/profile
 
 # Added for SKT
