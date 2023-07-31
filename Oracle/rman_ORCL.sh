@@ -57,8 +57,7 @@ run {
   as compressed backupset
   incremental level 0
   database
-  include current controlfile
-  plus archivelog;
+  include current controlfile;
 
   release channel dch1;
   release channel dch2;
