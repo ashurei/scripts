@@ -2,7 +2,7 @@
 ########################################################
 # Description : Rman Backup Script
 # Create DATE : 2023.02.06
-# Last Update DATE : 2023.04.12 by ashurei
+# Last Update DATE : 2023.07.31 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
