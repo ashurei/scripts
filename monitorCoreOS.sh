@@ -36,8 +36,8 @@ fi
 # ============================================================================================= #
 ##@ Delete past log file
 # ============================================================================================= #
-find ${LOGDIR:?}/monitorCoreOS_*.log -mtime +390 -type f -delete 2>&1
-find ${LOGDIR:?}/sshCoreOS_*.log -mtime +390 -type f -delete 2>&1
+find ${LOGDIR:?}/monitorCoreOS_*.log -mtime +14 -type f -delete 2>&1
+find ${LOGDIR:?}/sshCoreOS_*.log -mtime +14 -type f -delete 2>&1
 
 
 # ============================================================================================= #
