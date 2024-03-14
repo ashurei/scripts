@@ -2,7 +2,7 @@
 ########################################################
 # Description : Data Collection Tool with Oracle
 # Create DATE : 2021.04.20
-# Last Update DATE : 2023.02.07 by ashurei
+# Last Update DATE : 2023.03.21 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -27,7 +27,7 @@
 
 set +o posix    # For bash
 BINDIR="/tmp/DCT-oracle"
-SCRIPT_VER="2023.02.07.r01"
+SCRIPT_VER="2023.03.21.r01"
 
 export LANG=C
 COLLECT_DATE=$(date '+%Y%m%d')
@@ -1542,7 +1542,7 @@ EOF
 function ORAetc () {
   local SQLinvalid_object SQLsequence_max SQLunusable_index SQLunusable_part_index SQLunusable_subpart_index
   local SQLparallel_object SQLnologging_lob SQLnologging_table SQLnologging_index SQLresult_cache_object
-  local SQLpublic_db_link SQLdb_link SQL2pc_pending SQLrecyclebin SQLobjects SQLshared_pool
+  local SQLpublic_db_link SQLdb_link SQL2pc_pending SQLrecyclebin SQLobjects SQLshared_pool SQLsubpool
 
   SQLinvalid_object="
    select rtrim(owner) ||':'|| rtrim(object_type) ||':'|| count(*)
@@ -1648,6 +1648,14 @@ function ORAetc () {
     where ksmsslen/1024/1024 > 100
       and ksmssnam not in ('free memory','SQLA')
     order by ksmsslen;
+   "
+
+  SQLsubpool="
+   select nvl(decode(to_char(ksmdsidx),'0','0(Free)', ksmdsidx), 'Total') ||':'|| round(sum(ksmsslen)/1024/1024,2)
+     from x\$ksmss
+    where ksmsslen > 0
+    group by rollup (ksmdsidx)
+    order by 1;
    "
   
   { # Insert to output file
