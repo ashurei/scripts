@@ -25,7 +25,7 @@ menuentry 'Install CentOS 7' --class fedora --class gnu-linux --class gnu --clas
 	initrdefi /images/pxeboot/initrd.img
 }
 menuentry 'Install CentOS 7.9 custom with USB' --class fedora --class gnu-linux --class gnu --class os {
-	linuxefi /images/pxeboot/vmlinuz inst.ks=hd:LABEL=CENT79:/custom/ks79_usb.cfg inst.stage2=hd:LABEL=CENT79 quiet
+	linuxefi /images/pxeboot/vmlinuz inst.ks=hd:LABEL=CENT79:/custom/centos79_usb.ks inst.stage2=hd:LABEL=CENT79 quiet
 	initrdefi /images/pxeboot/initrd.img
 }
 menuentry 'Test this media & install CentOS 7' --class fedora --class gnu-linux --class gnu --class os {
