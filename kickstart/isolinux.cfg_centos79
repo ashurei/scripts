@@ -61,13 +61,13 @@ menu separator # insert an empty line
 label linux_cdrom
   menu label ^Install CentOS 7.9 custom with cdrom
   kernel vmlinuz
-  append initrd=initrd.img ks=cdrom:/custom/cent79_ks.cfg quiet
+  append initrd=initrd.img ks=cdrom:/custom/centos79_cdrom.ks quiet
 
 label linux_usb
   menu label ^Install CentOS 7.9 custom with usb
   menu default
   kernel vmlinuz
-  append initrd=initrd.img ks=hd:LABEL=CENT79:/custom/cent79_ks_usb.cfg inst.stage2=hd:LABEL=CENT79 quiet
+  append initrd=initrd.img ks=hd:LABEL=CENT79:/custom/centos79_usb.ks inst.stage2=hd:LABEL=CENT79 quiet
 
 label linux
   menu label ^Install CentOS 7
