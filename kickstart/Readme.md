@@ -1,8 +1,9 @@
 # 파일 위치
 ## kickstart config
 ```
-/custom/rocky8_usb.ks
 /custom/rhel8_usb.ks
+/custom/rocky8_usb.ks
+/custom/cent79_usb.ks
 ```
 
 ## isolinux.cfg (Legacy mode booting)
