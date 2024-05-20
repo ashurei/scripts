@@ -22,7 +22,7 @@ do
       shift
       shift
       ;;
-  -s) searchWord="$2"
+  -s) ipList="$2"
       shift
       shift
       ;;
@@ -47,21 +47,18 @@ then
   echo "[ERROR] Need log file name to monitor."
   exit 1
 fi
-if [ -z "$searchWord" ]
+if [ -z "$ipList" ]
 then
   echo "[ERROR] Need searchWord."
   exit 1
 fi
 
-#echo $alarmName
-#echo $tcoreID
-#echo $logObject
-#echo $searchWord
-
 # Escape \
-searchWord=$(echo "$searchWord" | sed 's/\\//g')
+#ipList=$(echo "$ipList" | sed 's/\\//g')
+#echo "$ipList"
+
+searchWord="sshd.*Accepted password for.* from (?!10.26.11.210 |150.23.15.163 |150.23.15.32 |150.31.135.210 |172.18.218.10 |172.25.7.236 |192.168.4.210 |200.131.121.210 |60.11.8.198 |60.11.8.210 |60.20.101.11 |60.22.64.211 |60.31.64.210 |70.12.231.210 |90.90.90.150 |60.50.37.112 |60.50.37.113 |60.50.37.114 |60.50.37.115 |60.50.37.116 |60.50.37.119 |60.50.37.120 |60.50.37.121 |60.50.37.122 |60.11.33.37 |10.30.24.239 |192.168.55.70 |192.168.226.55 |172.18.71.140 |172.25.156.15 |172.25.180.95 |172.25.19.150 |192.168.152.164 |192.168.152.230 |192.168.237.218 |192.168.55.95 |192.168.57.220 |200.161.121.4 |203.226.245.10 |60.11.30.34 |60.31.59.37 |60.50.76.7 |${ipList})"
 #echo $searchWord
-#echo "$searchWord"
 
 # Excute curl
 curl --location --request POST 'http://tcore-private-vip:9000/alarm/v1/alarm-definitions' \
