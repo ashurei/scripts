@@ -21,8 +21,6 @@ args = parser.parse_args()
 d_tcore = {}
 with open(args.file, "r") as f:
     for line in f:
-        #print(line.split()[0] + " " + line.split()[1])
-        #d_tcore[line.split()[0]] = [ line.split()[1], line.split[2] ]
         list_tcore = []
         list_tcore.append(line.split()[1])
         list_tcore.append(line.split()[2])
@@ -35,8 +33,6 @@ d_remote = {}
 remote_ip_txt = "output/remote_ip.txt"
 with open(remote_ip_txt, "r") as f:
     for line in f:
-        #print(line.split()[0] + " " + line.split()[1] + " " + line.split()[2])
-        #print(line.split("\t")[0] + " " + line.split("\t")[1].replace("\n", ""))
         d_remote[line.split("\t")[0]] = line.split("\t")[1].replace("\n", "")
 
 #print(d_remote)
