@@ -16,9 +16,9 @@ cd ${repo_base}
 dpkg-scanpackages -m ${apt_dir} > ${repo_dir}/Packages
 cat ${repo_dir}/Packages | gzip -9c > ${repo_dir}/Packages.gz
 
-# Create the Release file
-PKGS=$(wc -c ${repo_dir}/Packages)
-PKGS_GZ=$(wc -c ${repo_dir}/Packages.gz)
+# Create the Release file (have to execute in target directory)
+cd "$repo_dir" && PKGS=$(wc -c Packages)
+cd "$repo_dir" && PKGS_GZ=$(wc -c Packages.gz)
 
 cat << EOF > ${repo_dir}/Release
 Architectures: all
