@@ -1,13 +1,19 @@
 #!/bin/bash
 ########################################################
 # Description : TDIM ubuntu update repositry
-# Create DATE :
-# Last Update DATE : 2024.06 13 ashurei
+# Create DATE : 2024.06.12
+# Last Update DATE : 2024.06.14 ashurei
 # Copyright (c) Technical Solution, 2024
 ########################################################
 
+apt_dir="$1"
+if [ -z "$apt_dir" ]
+then
+  echo "usage) ./apt-repo.sh [Repository direcetory]"
+  exit 1
+fi
+
 repo_base="/home/tcore/tcore_dist/yum_repository"
-apt_dir="ubuntu16.04"
 repo_dir="${repo_base}/${apt_dir}"
 
 cd ${repo_base}
@@ -22,7 +28,7 @@ cd "$repo_dir" && PKGS_GZ=$(wc -c Packages.gz)
 
 cat << EOF > ${repo_dir}/Release
 Architectures: all
-Date: $(date -R)
+Date: $(date -Ru)
 MD5Sum:
  $(md5sum ${repo_dir}/Packages  | cut -d" " -f1) $PKGS
  $(md5sum ${repo_dir}/Packages.gz  | cut -d" " -f1) $PKGS_GZ
