@@ -86,9 +86,9 @@ remote_ip = ""
 for ip in common_IP:
     remote_ip = remote_ip + " |" + ip
 f = open("./output/" + today + "/register_common.sh", "w")
-f.write("./register.sh -f /var/log/secure -g " + args.group + " -s \"" + remote_ip[2:] + "\" -n \'비인가접속_공통_RHEL_" + center + "\'\n")
-f.write("./register.sh -f /var/log/auth.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -n \'비인가접속_공통_Debian_" + center + "\'\n")
-f.write("./register.sh -f /var/log/audit/audit.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -n \'비인가접속_공통_SUSE_" + center + "\'\n")
+f.write("./register.sh -f /var/log/secure -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o red -n \'비인가접속_공통_RHEL_" + center + "\'\n")
+f.write("./register.sh -f /var/log/auth.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o deb -n \'비인가접속_공통_Debian_" + center + "\'\n")
+f.write("./register.sh -f /var/log/audit/audit.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o sle -n \'비인가접속_공통_SUSE_" + center + "\'\n")
 f.close()
 
 ### Create 'remote_ip.txt' from 'd_remote'
