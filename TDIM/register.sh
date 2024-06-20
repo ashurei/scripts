@@ -2,7 +2,7 @@
 ########################################################
 # Description : Register Alarm rule using TDIM API
 # Create DATE : 2024.05.20
-# Last Update DATE : 2024.06.18 by ashurei
+# Last Update DATE : 2024.06.20 by ashurei
 # Copyright (c) Technical Solution, 2024
 ########################################################
 
@@ -27,6 +27,10 @@ do
       shift
       ;;
   -s) ipList="$2"
+      shift
+      shift
+      ;;
+  -o) osType="$2"
       shift
       shift
       ;;
@@ -73,7 +77,13 @@ then
   tcoreID="{\"targetResourceId\":\"${tcoreID}\"}"
 fi
 
-searchWord="sshd.*Accepted password for.* from (?!${ipList} )"
+### Create search word with IP.
+if [ "$osType" == 'sle' ]
+then
+  searchWord="(?!${ipList}) terminal=ssh res=success"
+else
+  searchWord="sshd.*Accepted password for.* from (?!${ipList} )"
+fi
 #echo $searchWord
 
 # Excute curl
