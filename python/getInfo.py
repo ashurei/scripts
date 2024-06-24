@@ -50,7 +50,7 @@ with open(args.common, "r") as f:
 f = open(args.file, "r")
 reader = csv.DictReader(f)
 
-### Process information
+# Process information
 temp = ""
 access_IP = []
 d_remote = {}
@@ -79,3 +79,53 @@ for dict_row in reader:
     temp = dict_row['EQP_ID']
 
 f.close()
+
+#print(len(d_remote))
+#print(d_sims)
+
+### Create output directory
+today = datetime.datetime.now().strftime("%Y%m%d")
+os.makedirs("./output/" + today, exist_ok=True)
+
+### Create 'register_common.sh' from 'common_IP'
+remote_ip = ""
+for ip in common_IP:
+    remote_ip = remote_ip + " |" + ip
+
+# [2:] ==> Remove first " |"
+filename = "./output/" + today + "/register_common.sh"
+with open(filename, "w") as f:
+    f.write("./register.sh -f /var/log/secure -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o red -n \'비인가접속_공통_RHEL_" + center + "\'\n")
+    f.write("./register.sh -f /var/log/auth.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o deb -n \'비인가접속_공통_Debian_" + center + "\'\n")
+    f.write("./register.sh -f /var/log/audit/audit.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o sle -n \'비인가접속_공통_SUSE_" + center + "\'\n")
+
+### Create 'remote_ip.txt' from 'd_remote' for access IP list
+filename = "./output/" + today + "/remote_ip.txt"
+with open(filename, "w") as f:
+    for key,value in d_remote.items():
+        # Merge IP of each machine
+        remote_ip = ""
+        for v in value:
+          remote_ip = remote_ip + " |" + v
+        f.write(key + "\t" + remote_ip[2:] + "\n")  # Cut left " |"
+
+### Create 'get_tdim_info.sh' from 'd_remote.keys()' to find resourceid, resourcename, ostype in TDIM using SIMS IP as key.
+tdim_info = "/tmp/tcore_" + today + ".txt"
+filename = "./output/" + today + "/get_tdim_info.sh"
+with open(filename, "w") as f:
+    f.write("cp /dev/null " + tdim_info + "\n")
+    for key in d_remote.keys():
+        #sql = "mysql -u tcore -pTcore12# -h tcore-private-vip -e \"select ip, resourceid, resourcename, ostype from vw_rep_resource_bas where ip='" + value + "'\" -sN tcore_resource >> /tmp/tcore.txt\n"
+        sql = "select a.ip, a.resourceid, a.resourcename, lower(substr(b.osname,1,3)) from vw_rep_resource_bas a, vw_rep_resource_management b where a.resourceid = b.resourceid and a.ip='" + key + "'"
+        cmd = "mysql -u tcore -pTcore12# -h tcore-private-vip -e \"" + sql + "\" -sN tcore_resource >> " + tdim_info + "\n"
+        f.write(cmd)
+
+### Create 'check_in_tdim.sh from 'd_sims' for check TDIM vs SIMS
+sims_info = "/tmp/sims_" + today + ".txt"
+filename = "./output/" + today + "/check_in_tdim.sh"
+sims_ip = ""
+with open(filename, "w") as f:
+    for key,value in d_sims.items():
+        sql = "select resourceid, resourcename, ip from vw_rep_resource_bas where ip = '" + value + "'"
+        cmd = "mysql -u tcore -pTcore12# -h tcore-private-vip -e \"" + sql + "\" -sN tcore_resource >> " + sims_info + "\n"
+        f.write(cmd)
