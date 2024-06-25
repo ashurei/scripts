@@ -2,10 +2,11 @@
 ########################################################
 # Description : Register Alarm rule using TDIM API
 # Create DATE : 2024.05.20
-# Last Update DATE : 2024.06.20 by ashurei
+# Last Update DATE : 2024.06.25 by ashurei
 # Copyright (c) Technical Solution, 2024
 ########################################################
 
+# Version: 2024.06.25.r1
 # Input option
 while [ $# -gt 0 ]
 do
@@ -81,8 +82,12 @@ fi
 if [ "$osType" == 'sle' ]
 then
   searchWord="(?!${ipList}) terminal=ssh res=success"
-else
+elif [[ "$osType" == 'deb' || "$osType" == 'red' || "$osType" == 'red' || "$osType" == 'cen' || "$osType" == 'roc' ]]
+then
   searchWord="sshd.*Accepted password for.* from (?!${ipList} )"
+else
+  echo "[ERROR] OS type is wrong."
+  exit 1
 fi
 #echo $searchWord
 
