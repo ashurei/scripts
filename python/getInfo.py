@@ -1,11 +1,11 @@
 ########################################################
 # Description : Get remote ip from SIMS REPORT
 # Create DATE : 2024.05.21
-# Last Update DATE : 2024.06.21 by ashurei
+# Last Update DATE : 2024.06.27 by ashurei
 # Copyright (c) Technical Solution, 2024
 #########################################################
 
-# Version: 2024.05.21.r5
+# Version: 2024.06.27.r1
 # Create files from SIMS REPORT csv file.
 #   resource_common.sh
 #   remote_ip.txt
@@ -50,7 +50,7 @@ with open(args.common, "r") as f:
 f = open(args.file, "r")
 reader = csv.DictReader(f)
 
-# Process information
+### Process information
 temp = ""
 access_IP = []
 d_remote = {}
@@ -92,14 +92,13 @@ remote_ip = ""
 for ip in common_IP:
     remote_ip = remote_ip + " |" + ip
 
-# [2:] ==> Remove first " |"
 filename = "./output/" + today + "/register_common.sh"
 with open(filename, "w") as f:
     f.write("./register.sh -f /var/log/secure -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o red -n \'비인가접속_공통_RHEL_" + center + "\'\n")
     f.write("./register.sh -f /var/log/auth.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o deb -n \'비인가접속_공통_Debian_" + center + "\'\n")
     f.write("./register.sh -f /var/log/audit/audit.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o sle -n \'비인가접속_공통_SUSE_" + center + "\'\n")
 
-### Create 'remote_ip.txt' from 'd_remote' for access IP list
+### Create 'remote_ip.txt' from 'd_remote'
 filename = "./output/" + today + "/remote_ip.txt"
 with open(filename, "w") as f:
     for key,value in d_remote.items():
@@ -109,7 +108,7 @@ with open(filename, "w") as f:
           remote_ip = remote_ip + " |" + v
         f.write(key + "\t" + remote_ip[2:] + "\n")  # Cut left " |"
 
-### Create 'get_tdim_info.sh' from 'd_remote.keys()' to find resourceid, resourcename, ostype in TDIM using SIMS IP as key.
+### Create 'get_tdim_info.sh' from 'd_remote.keys()' to find resourceid, resourcename in TDIM using SIMS IP.
 tdim_info = "/tmp/tcore_" + today + ".txt"
 filename = "./output/" + today + "/get_tdim_info.sh"
 with open(filename, "w") as f:
@@ -120,12 +119,13 @@ with open(filename, "w") as f:
         cmd = "mysql -u tcore -pTcore12# -h tcore-private-vip -e \"" + sql + "\" -sN tcore_resource >> " + tdim_info + "\n"
         f.write(cmd)
 
-### Create 'check_in_tdim.sh from 'd_sims' for check TDIM vs SIMS
+### Create 'check_in_tdim.sh from 'd_sims'
 sims_info = "/tmp/sims_" + today + ".txt"
 filename = "./output/" + today + "/check_in_tdim.sh"
 sims_ip = ""
 with open(filename, "w") as f:
+    # Merge IP
     for key,value in d_sims.items():
-        sql = "select resourceid, resourcename, ip from vw_rep_resource_bas where ip = '" + value + "'"
+        sql = "select ip, resourceid, resourcename from vw_rep_resource_bas where ip = '" + value + "'"
         cmd = "mysql -u tcore -pTcore12# -h tcore-private-vip -e \"" + sql + "\" -sN tcore_resource >> " + sims_info + "\n"
         f.write(cmd)
