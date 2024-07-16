@@ -1,11 +1,11 @@
 ########################################################
 # Description : Get remote ip from SIMS REPORT
 # Create DATE : 2024.05.21
-# Last Update DATE : 2024.06.27 by ashurei
+# Last Update DATE : 2024.07.16 by ashurei
 # Copyright (c) Technical Solution, 2024
 #########################################################
 
-# Version: 2024.06.27.r1
+### Version: 2024.07.16.r2
 # Create files from SIMS REPORT csv file.
 #   resource_common.sh
 #   remote_ip.txt
@@ -36,6 +36,7 @@ if args.location not in centers.keys():
     exit
 center = centers[args.location]
 
+# ================================================================================================================================================= #
 ### Define common remote IP
 common_IP = []
 with open(args.common, "r") as f:
@@ -45,6 +46,7 @@ with open(args.common, "r") as f:
         common_IP.append(line)
 #print(common_IP)
 #exit
+# ================================================================================================================================================= #
 
 ### Read CSV file
 f = open(args.file, "r")
@@ -61,12 +63,15 @@ for dict_row in reader:
     d_sims[dict_row['관리장비명']] = dict_row['SIMS 연동 IP']
 
     # temp != Machine IP, Initialize LIST because next machine is started.
-    if temp != dict_row['EQP_ID']:
+    if temp != dict_row['SIMS 연동 IP']:
+        # access_IP is null means this EQP_ID have only common IP.
+        if d_remote and not access_IP:
+           d_remote[temp] = 'empty'
         access_IP = []
 
     # Skip insert remote IP to LIST when access_IP in common_IP
     if dict_row['Remote 접속 IP'] in common_IP:
-        temp = dict_row['EQP_ID']
+        temp = dict_row['SIMS 연동 IP']
         continue
 
     # Insert Remote IP to LIST when access_IP not in common_IP
@@ -76,32 +81,27 @@ for dict_row in reader:
     d_remote[dict_row['SIMS 연동 IP']] = list(dict.fromkeys(access_IP)) # Remove duplicate
 
     # Save current row value for next loop
-    temp = dict_row['EQP_ID']
+    temp = dict_row['SIMS 연동 IP']
 
 f.close()
 
 #print(len(d_remote))
 #print(d_sims)
+#print(d_remote)
 
+# ================================================================================================================================================= #
 ### Create output directory
 today = datetime.datetime.now().strftime("%Y%m%d")
-os.makedirs("./output/" + today, exist_ok=True)
-
-### Create 'register_common.sh' from 'common_IP'
-remote_ip = ""
-for ip in common_IP:
-    remote_ip = remote_ip + " |" + ip
-
-filename = "./output/" + today + "/register_common.sh"
-with open(filename, "w") as f:
-    f.write("./register.sh -f /var/log/secure -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o red -n \'비인가접속_공통_RHEL_" + center + "\'\n")
-    f.write("./register.sh -f /var/log/auth.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o deb -n \'비인가접속_공통_Debian_" + center + "\'\n")
-    f.write("./register.sh -f /var/log/audit/audit.log -g " + args.group + " -s \"" + remote_ip[2:] + "\" -o sle -n \'비인가접속_공통_SUSE_" + center + "\'\n")
+outdir = "./output/" + today + "_" + args.location
+os.makedirs(outdir, exist_ok=True)
 
 ### Create 'remote_ip.txt' from 'd_remote'
-filename = "./output/" + today + "/remote_ip.txt"
+filename = outdir + "/remote_ip.txt"
 with open(filename, "w") as f:
     for key,value in d_remote.items():
+        if value == 'empty':
+            f.write(key + "\t\n")
+            continue
         # Merge IP of each machine
         remote_ip = ""
         for v in value:
@@ -109,8 +109,8 @@ with open(filename, "w") as f:
         f.write(key + "\t" + remote_ip[2:] + "\n")  # Cut left " |"
 
 ### Create 'get_tdim_info.sh' from 'd_remote.keys()' to find resourceid, resourcename in TDIM using SIMS IP.
-tdim_info = "/tmp/tcore_" + today + ".txt"
-filename = "./output/" + today + "/get_tdim_info.sh"
+tdim_info = "/tmp/tcore_" + today + "_" + args.location + ".txt"
+filename = outdir + "/get_tdim_info.sh"
 with open(filename, "w") as f:
     f.write("cp /dev/null " + tdim_info + "\n")
     for key in d_remote.keys():
@@ -120,8 +120,8 @@ with open(filename, "w") as f:
         f.write(cmd)
 
 ### Create 'check_in_tdim.sh from 'd_sims'
-sims_info = "/tmp/sims_" + today + ".txt"
-filename = "./output/" + today + "/check_in_tdim.sh"
+sims_info = "/tmp/sims_" + today + "_" + args.location + ".txt"
+filename = outdir + "/check_in_tdim.sh"
 sims_ip = ""
 with open(filename, "w") as f:
     # Merge IP
