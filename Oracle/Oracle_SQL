@@ -53,7 +53,7 @@ select * from dba_profiles order by 1, 2;
 	
 # SYNONYM 조회
 set line 200 pages 1000
-col owner for a12
+col owner for a12ㅣ
 col synonym_name for a30
 col table_owner for a10
 col table_name for a30
@@ -69,7 +69,7 @@ col status for a10
 select file_id, file_name, tablespace_name, bytes/1024/1024 MB, status, autoextensible from dba_data_files order by file_name;
 select file_id, file_name, tablespace_name, bytes/1024/1024 MB, status, autoextensible from dba_temp_files;
 select file_id, file_name, tablespace_name, bytes/1024/1024 MB, status, autoextensible from dba_data_files
-where tablespace_name=upper('&tablespace_name');
+ where tablespace_name=upper('&tablespace_name');
 select file_name, tablespace_name, bytes/1024/1024 MB, autoextensible from dba_data_files where autoextensible='YES';
 
 
@@ -152,11 +152,12 @@ col owner for a10
 col segment_name for a30
 col segment_type for a15
 col tablespace_name for a15
-select owner, segment_name, segment_type, tablespace_name, sum(bytes)/1024/1024 as MB from dba_segments
-where owner=upper('&owner')
+select owner, segment_name, segment_type, tablespace_name, bytes/1024/1024 as MB
+  from dba_segments
+ where owner=upper('&owner')
 --and segment_type='TABLE'
-GROUP BY owner, segment_name, segment_type, tablespace_name
-order by MB desc;
+ GROUP BY owner, segment_name, segment_type, tablespace_name
+ order by MB desc;
 
 
 # Tablespace Resize 확인 (db_block_size에 따라 수정 필요. 8192면 8/1024, 4096이면 4/1024)
@@ -470,10 +471,9 @@ SELECT  SUBSTR(A.COLUMN_NAME,1,15) COLUMN_NAME, DECODE(B.CONSTRAINT_TYPE, 'P','P
 
 
 # Datafile이 사용하고 있는 실제 용량
-set line 250
-set pages 100
+set line 200 set pages 1000
 col file_name for a50
-col tablespace_name for a15
+col tablespace_name for a25
 col str for a100
 SELECT b.file_name "FILE_NAME", -- DataFile Name 
        b.tablespace_name "TABLESPACE_NAME", -- TableSpace Name 
@@ -1016,6 +1016,21 @@ where SAMPLE_TIME between to_timestamp('20170109 08:00','YYYYMMDD HH24:MI') and 
 and event like 'SQL*Net break/reset to%'
 --sql_id='5banwfbnk5yfa'
 order by 1 asc ;
+
+-- 구간 별 Event 발생 조회
+set linesize 200 pages 1000
+col machine for a50
+col event for a50
+select to_char(sample_time, 'YYYYMMDD-HH24:MI:SS') sample_time
+      ,machine
+	  ,event
+	  ,sql_id
+	  ,(select sql_text from v$sqlarea where sql_id = h.sql_id) sql_text
+  from dba_hist_active_sess_history
+ where to_char(sample_time, 'YYYYMMDD-HH24:MI:SS') between '20241029-06:30:00' and '20241029-06:50:00'
+   and event is not null
+ order by 1;
+
 
 
 
