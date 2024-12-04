@@ -2,8 +2,8 @@
 ########################################################
 # Description : Rman Archive log Backup Script
 # Create DATE : 2023.02.06
-# Last Update DATE : 2023.06.02 by ashurei
-# Copyright (c) ashurei@sktelecom.com, 2023
+# Last Update DATE : 2024.12.04 by ashurei
+# Copyright (c) ashurei@sktelecom.com, 2024
 ########################################################
 
 DATE=$(date '+%Y%m%d_%H')
@@ -29,6 +29,7 @@ fi
 if [ ! -d "${BACKDIR}" ]
 then
   echo "Backup directory is not exists."
+  exit
 fi
 
 ### Delete log
