@@ -2,7 +2,7 @@
 ########################################################
 # Description : Rman Backup Script
 # Create DATE : 2023.02.06
-# Last Update DATE : 2023.07.31 by ashurei
+# Last Update DATE : 2024.12.04 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2023
 ########################################################
 
@@ -29,6 +29,7 @@ fi
 if [ ! -d "${BACKDIR}" ]
 then
   echo "Backup directory is not exists."
+  exit 1
 fi
 
 ### Delete log
