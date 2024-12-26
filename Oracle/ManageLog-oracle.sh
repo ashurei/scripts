@@ -42,22 +42,13 @@ function Get_oracle_env() {
     # If $ORACLE_HOME is not directory or null
     if [[ ! -d "${ORACLE_HOME}" || -z "${ORACLE_HOME}" ]]
     then
-      Print_log "There is not ORACLE_HOME."
+      echo "There is not ORACLE_HOME."
       exit 1
     fi
   else
-    Print_log "Oracle Database is not exists on this server."
+    echo "Oracle Database is not exists on this server."
     exit 1
   fi
-}
-
-### Logging error
-function Print_log() {
-  local LOG LOGDATE COLLECT_YEAR
-  COLLECT_YEAR=$(date '+%Y')
-  LOG="${BINDIR}/rman_${HOSTNAME}_${COLLECT_YEAR}.log"
-  LOGDATE="[$(date '+%Y%m%d-%H:%M:%S')]"
-  echo "${LOGDATE} $1" >> "${LOG}"
 }
 
 
