@@ -85,8 +85,8 @@ do
   find "${TRACE}" -maxdepth 1 -name "*[0-9].tr[c,m]" -mtime +${RETENTION_DAYS} -type f -delete
 
   # Rotate alert log
-  cp ${TRACE}/alert_${ORACLE_SID}.log ${TRACE}/alert_${ORACLE_SID}.log.$(date '+%Y%m%d')
-  cp /dev/null ${TRACE}/alert_${ORACLE_SID}.log
+  cp "${TRACE}/alert_${ORACLE_SID}.log" "${TRACE}/alert_${ORACLE_SID}.log.$(date '+%Y%m%d')"
+  cp /dev/null "${TRACE}/alert_${ORACLE_SID}.log"
 
   # Remove audit file
   AUDIT="${DIAG_DEST}/admin/${DATABASE_NAME}/adump"
