@@ -2,7 +2,7 @@
 ########################################################
 # Description : Management of Database logs for Oracle
 # Create DATE : 2021.07.19
-# Last Update DATE : 2021.10.04 by ashurei
+# Last Update DATE : 2024.12.26 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2021
 ########################################################
 
@@ -10,7 +10,7 @@
 
 ################################
 # Need to modify
-DIAG_DEST="/oracle/database"		# diagnostic_dest
+DIAG_DEST="/oracle/database"                # diagnostic_dest
 RETENTION_DAYS="30"
 ################################
 
@@ -70,7 +70,7 @@ for listener in ${LISTENERs}
 do
   LISTENER_TRACE="${DIAG_DEST}/diag/tnslsnr/${HOSTNAME}/${listener,,}/trace"
   LISTENER_ALERT="${DIAG_DEST}/diag/tnslsnr/${HOSTNAME}/${listener,,}/alert"
-  
+
   find "${LISTENER_TRACE}" -maxdepth 1 -name "${listener,,}_[0-9]*.log" -mtime +${RETENTION_DAYS} -type f -delete
   find "${LISTENER_ALERT}" -maxdepth 1 -name "log_[0-9]*.xml" -mtime +${RETENTION_DAYS} -type f -delete
 done
@@ -87,11 +87,17 @@ do
   else
     DATABASE_NAME="${ORACLE_SID}"
   fi
-  
+
+  # Remove rdbms trace
   DATABASE_NAME_LOWER=$(echo "${DATABASE_NAME}" | tr '[:upper:]' '[:lower:]')
   TRACE="${DIAG_DEST}/diag/rdbms/${DATABASE_NAME_LOWER}/${ORACLE_SID}/trace"
   find "${TRACE}" -maxdepth 1 -name "*[0-9].tr[c,m]" -mtime +${RETENTION_DAYS} -type f -delete
-  
+
+  # Rotate alert log
+  cp ${TRACE}/alert_${ORACLE_SID}.log ${TRACE}/alert_${ORACLE_SID}.log.$(date '+%Y%m%d')
+  cp /dev/null ${TRACE}/alert_${ORACLE_SID}.log
+
+  # Remove audit file
   AUDIT="${DIAG_DEST}/admin/${DATABASE_NAME}/adump"
   find "${AUDIT}" -maxdepth 1 -name "${ORACLE_SID}_ora_*.aud" -mtime +${RETENTION_DAYS} -type f -delete
 done
