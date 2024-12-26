@@ -59,10 +59,15 @@ Get_oracle_env
 LISTENERs=$(ps aux | grep tnslsnr | grep "^${ORACLE_USER}" | grep -v grep | awk '{print $12}')
 for listener in ${LISTENERs}
 do
-  LISTENER_TRACE="${DIAG_DEST}/diag/tnslsnr/${HOSTNAME}/${listener,,}/trace"
-  LISTENER_ALERT="${DIAG_DEST}/diag/tnslsnr/${HOSTNAME}/${listener,,}/alert"
-
-  find "${LISTENER_TRACE}" -maxdepth 1 -name "${listener,,}_[0-9]*.log" -mtime +${RETENTION_DAYS} -type f -delete
+  # Rotate & Remove
+  TRACE_PATH="$(lsnrctl status $listener | grep "Listener Log File" | awk '{print $4}' | awk -F'alert' '{print $1}')trace"
+  cp "${TRACE_PATH}/${listener,,}.log" "${TRACE_PATH}/${listener,,}.log.$(date '+%Y%m%d')"
+  tar cfz "${TRACE_PATH}/${listener,,}.log.$(date '+%Y%m%d')".tgz "${TRACE_PATH}/${listener,,}.log.$(date '+%Y%m%d')" --remove-files
+  cp /dev/null "${TRACE_PATH}/${listener,,}.log"
+  find "${TRACE_PATH}" -maxdepth 1 -name "${listener,,}*.log.tgz" -mtime +${RETENTION_DAYS} -type f -delete
+  
+  # Remove
+  LISTENER_ALERT="${GRID_BASE}/diag/tnslsnr/${HOSTNAME}/${listener,,}/alert"
   find "${LISTENER_ALERT}" -maxdepth 1 -name "log_[0-9]*.xml" -mtime +${RETENTION_DAYS} -type f -delete
 done
 
