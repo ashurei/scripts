@@ -1446,6 +1446,197 @@ where b.event = 'enq: TX - row lock contention'
 /
 
 
+==============================================================================
+### TOP SQL (https://unioneinc.tistory.com/63)
+-- CPU 기준
+set line 400 pages 1000
+col sql_id for a15
+col username for a10
+col module for a30
+col last_active_time for a20
+col graph format a23
+col sql_text for a80
+col exec for 99999999999
+set long 40
+SELECT /* Finding SQL sort by elapsed time */
+       main.sql_id
+      ,main.parsing_schema_name username
+      ,substr(module,0,30) module
+      ,to_char(LAST_ACTIVE_TIME,'yyyy-mm-dd hh24:mi:ss') LAST_ACTIVE_TIME
+      ,main.executions exec
+      ,main.cpu_time/1000 "CPU_TIME(Sec)"
+      ,main.cpu_time_ratio
+--      ,'['||rpad(nvl(lpad('*', main.elapsed_time_ratio/5, '*'), '-'), 20, '-')||']' "Graph"
+--      ,(SELECT -- listagg( sql_text , ' ' ) WITHIN GROUP ( ORDER BY piece)
+--               rtrim(xmlagg(xmlelement(e, sql_text ,' ').extract('//text()') order by piece).GetClobVal(),' ')
+      ,(select substr(sql_text, 0, 80) FROM v$sqlarea b WHERE b.sql_id = main.sql_id) as sql_text
+  FROM ( SELECT sql_id
+               ,plan_hash_value
+               ,parsing_schema_name
+               ,executions
+               ,buffer_gets
+               ,disk_reads
+               ,direct_writes
+               ,cpu_time
+               ,elapsed_time
+               ,LAST_ACTIVE_TIME
+               ,module
+               ,round(buffer_gets/sum(buffer_gets) OVER()*100,1) buffer_gets_ratio
+               ,round(cpu_time/sum(cpu_time) OVER()*100,1) cpu_time_ratio
+               ,round(elapsed_time/sum(elapsed_time) OVER () *100 ,1) elapsed_time_ratio
+          FROM v$sqlarea a
+         WHERE executions > 1
+           and parsing_schema_name not in ('SYSAUX','SYSMAN','XDB','HR','ODM','OUTLN','OE','SH','PM','IX','WK_TEST','PERFSTAT','DBSNMP','OLAPSYS','QS_CS','QS_CB','QS_CBADM','QS_OS','QS_WS','QS','QS_ADM','ODM_MTR' ,'WKPROXY','QS_ES','ANONYMOUS','WKSYS','WMSYS','APEX_030200','APEX_PUBLIC_USER','APPQOSSYS','BI','CTXSYS','DIP','EXFSYS','FLOWS_FILES','MDDATA','MDSYS','MGMT_VIEW','ORACLE_OCM','ORDDATA','ORDPLUGINS','ORDSYS','OWBSYS','OWBSYS_AUDIT','SCOTT','SI_INFORMTN_SCHEMA','SPATIAL_CSW_ADMIN_USR','SPATIAL_WFS_ADMIN_USR','XS$NULL')
+           and NOT (module LIKE 'Golden%'
+                         OR module LIKE 'TOAD%'
+                 OR module LIKE 'toad%'
+                 OR module LIKE 'Orange%'
+                 OR module LIKE 'exp%'
+                 OR module LIKE 'SQL*Plus%'
+                 OR module LIKE 'SQL Developer%'
+                 OR module LIKE 'oracle@%'
+                 OR module LIKE 'sqlplus@%'
+               )
+           AND NOT (TRIM(SQL_TEXT) LIKE '%:Q%'
+                 OR TRIM(SQL_TEXT) LIKE 'declare%'
+                 OR TRIM(SQL_TEXT) LIKE 'DECLARE%'
+                 OR TRIM(SQL_TEXT) LIKE 'truncate%'
+                 OR TRIM(SQL_TEXT) LIKE 'TRUNCATE%'
+                 OR TRIM(SQL_TEXT) LIKE '%dba\_%' escape '\'
+                 OR TRIM(SQL_TEXT) LIKE '%DBA\_%' escape '\'
+                 OR TRIM(SQL_TEXT) LIKE 'SQLGateMain%'
+                 OR TRIM(SQL_TEXT) LIKE 'ALTER SESSION%'
+                 OR TRIM(SQL_TEXT) LIKE '%v$%'
+                 OR TRIM(SQL_TEXT) LIKE '%x$%')
+         ORDER BY cpu_time/sum(cpu_time) OVER()*100 desc ) main
+WHERE rownum <= 20;
+
+-- 실행시간 기준
+set line 400 pages 1000
+col sql_id for a15
+col username for a10
+col module for a30
+col last_active_time for a20
+col graph format a23
+col sql_text for a80
+col exec for 99999999999
+set long 40
+SELECT /* Finding SQL sort by elapsed time */
+       main.sql_id
+      ,main.parsing_schema_name username
+      ,substr(module,0,30) module
+      ,to_char(LAST_ACTIVE_TIME,'yyyy-mm-dd hh24:mi:ss') LAST_ACTIVE_TIME
+      ,main.executions exec
+      ,round(main.elapsed_time/1000, 0) "ELAPSED_TIME(Sec)"
+      ,main.elapsed_time_ratio
+      ,rtrim(to_char( main.executions/(main.elapsed_time/1000), 'FM9990.9999')) per_sec
+--      ,'['||rpad(nvl(lpad('*', main.elapsed_time_ratio/5, '*'), '-'), 20, '-')||']' "Graph"
+--      ,(SELECT -- listagg( sql_text , ' ' ) WITHIN GROUP ( ORDER BY piece)
+--               rtrim(xmlagg(xmlelement(e, sql_text ,' ').extract('//text()') order by piece).GetClobVal(),' ')
+      ,(select substr(sql_text, 0, 80) FROM v$sqlarea b WHERE b.sql_id = main.sql_id) as sql_text
+  FROM ( SELECT sql_id
+               ,plan_hash_value
+               ,parsing_schema_name
+               ,executions
+               ,buffer_gets
+               ,disk_reads
+               ,direct_writes
+               ,cpu_time
+               ,elapsed_time
+               ,LAST_ACTIVE_TIME
+               ,module
+               ,round(buffer_gets/sum(buffer_gets) OVER()*100,1) buffer_gets_ratio
+               ,round(cpu_time/sum(cpu_time) OVER()*100,1) cpu_time_ratio
+               ,round(elapsed_time/sum(elapsed_time) OVER () *100 ,1) elapsed_time_ratio
+          FROM v$sqlarea a
+         WHERE executions > 1
+           and parsing_schema_name not in ('SYSAUX','SYSMAN','XDB','HR','ODM','OUTLN','OE','SH','PM','IX','WK_TEST','PERFSTAT','DBSNMP','OLAPSYS','QS_CS','QS_CB','QS_CBADM','QS_OS','QS_WS','QS','QS_ADM','ODM_MTR' ,'WKPROXY','QS_ES','ANONYMOUS','WKSYS','WMSYS','APEX_030200','APEX_PUBLIC_USER','APPQOSSYS','BI','CTXSYS','DIP','EXFSYS','FLOWS_FILES','MDDATA','MDSYS','MGMT_VIEW','ORACLE_OCM','ORDDATA','ORDPLUGINS','ORDSYS','OWBSYS','OWBSYS_AUDIT','SCOTT','SI_INFORMTN_SCHEMA','SPATIAL_CSW_ADMIN_USR','SPATIAL_WFS_ADMIN_USR','XS$NULL')
+           and NOT (module LIKE 'Golden%'
+		         OR module LIKE 'TOAD%'
+                 OR module LIKE 'toad%'
+                 OR module LIKE 'Orange%'
+                 OR module LIKE 'exp%'
+                 OR module LIKE 'SQL*Plus%'
+                 OR module LIKE 'SQL Developer%'
+                 OR module LIKE 'oracle@%'
+                 OR module LIKE 'sqlplus@%'
+               )
+           AND NOT (TRIM(SQL_TEXT) LIKE '%:Q%'
+                 OR TRIM(SQL_TEXT) LIKE 'declare%'
+                 OR TRIM(SQL_TEXT) LIKE 'DECLARE%'
+                 OR TRIM(SQL_TEXT) LIKE 'truncate%'
+                 OR TRIM(SQL_TEXT) LIKE 'TRUNCATE%'
+                 OR TRIM(SQL_TEXT) LIKE '%dba\_%' escape '\'
+                 OR TRIM(SQL_TEXT) LIKE '%DBA\_%' escape '\'
+                 OR TRIM(SQL_TEXT) LIKE 'SQLGateMain%'
+                 OR TRIM(SQL_TEXT) LIKE 'ALTER SESSION%'
+                 OR TRIM(SQL_TEXT) LIKE '%v$%'
+                 OR TRIM(SQL_TEXT) LIKE '%x$%')
+         ORDER BY elapsed_time_ratio desc ) main
+WHERE rownum <= 20;
+
+-- 처리량 기준
+set line 400 pages 1000
+col sql_id for a15
+col username for a10
+col module for a30
+col last_active_time for a20
+col graph format a23
+col sql_text for a80
+col exec for 99999999999
+set long 40
+SELECT /* Finding SQL sort by elapsed time */
+       main.sql_id
+      ,main.parsing_schema_name username
+      ,substr(module,0,30) module
+      ,to_char(LAST_ACTIVE_TIME,'yyyy-mm-dd hh24:mi:ss') LAST_ACTIVE_TIME
+      ,main.executions exec
+      ,main.buffer_gets
+      ,main.buffer_gets_ratio
+--      ,'['||rpad(nvl(lpad('*', main.elapsed_time_ratio/5, '*'), '-'), 20, '-')||']' "Graph"
+--      ,(SELECT -- listagg( sql_text , ' ' ) WITHIN GROUP ( ORDER BY piece)
+--               rtrim(xmlagg(xmlelement(e, sql_text ,' ').extract('//text()') order by piece).GetClobVal(),' ')
+      ,(select substr(sql_text, 0, 80) FROM v$sqlarea b WHERE b.sql_id = main.sql_id) as sql_text
+  FROM ( SELECT sql_id
+               ,plan_hash_value
+               ,parsing_schema_name
+               ,executions
+               ,buffer_gets
+               ,disk_reads
+               ,direct_writes
+               ,cpu_time
+               ,elapsed_time
+               ,LAST_ACTIVE_TIME
+               ,module
+               ,round(buffer_gets/sum(buffer_gets) OVER()*100,1) buffer_gets_ratio
+               ,round(cpu_time/sum(cpu_time) OVER()*100,1) cpu_time_ratio
+               ,round(elapsed_time/sum(elapsed_time) OVER () *100 ,1) elapsed_time_ratio
+          FROM v$sqlarea a
+         WHERE executions > 1
+           and parsing_schema_name not in ('SYSAUX','SYSMAN','XDB','HR','ODM','OUTLN','OE','SH','PM','IX','WK_TEST','PERFSTAT','DBSNMP','OLAPSYS','QS_CS','QS_CB','QS_CBADM','QS_OS','QS_WS','QS','QS_ADM','ODM_MTR' ,'WKPROXY','QS_ES','ANONYMOUS','WKSYS','WMSYS','APEX_030200','APEX_PUBLIC_USER','APPQOSSYS','BI','CTXSYS','DIP','EXFSYS','FLOWS_FILES','MDDATA','MDSYS','MGMT_VIEW','ORACLE_OCM','ORDDATA','ORDPLUGINS','ORDSYS','OWBSYS','OWBSYS_AUDIT','SCOTT','SI_INFORMTN_SCHEMA','SPATIAL_CSW_ADMIN_USR','SPATIAL_WFS_ADMIN_USR','XS$NULL')
+           and NOT (module LIKE 'Golden%'
+                         OR module LIKE 'TOAD%'
+                 OR module LIKE 'toad%'
+                 OR module LIKE 'Orange%'
+                 OR module LIKE 'exp%'
+                 OR module LIKE 'SQL*Plus%'
+                 OR module LIKE 'SQL Developer%'
+                 OR module LIKE 'oracle@%'
+                 OR module LIKE 'sqlplus@%'
+               )
+           AND NOT (TRIM(SQL_TEXT) LIKE '%:Q%'
+                 OR TRIM(SQL_TEXT) LIKE 'declare%'
+                 OR TRIM(SQL_TEXT) LIKE 'DECLARE%'
+                 OR TRIM(SQL_TEXT) LIKE 'truncate%'
+                 OR TRIM(SQL_TEXT) LIKE 'TRUNCATE%'
+                 OR TRIM(SQL_TEXT) LIKE '%dba\_%' escape '\'
+                 OR TRIM(SQL_TEXT) LIKE '%DBA\_%' escape '\'
+                 OR TRIM(SQL_TEXT) LIKE 'SQLGateMain%'
+                 OR TRIM(SQL_TEXT) LIKE 'ALTER SESSION%'
+                 OR TRIM(SQL_TEXT) LIKE '%v$%'
+                 OR TRIM(SQL_TEXT) LIKE '%x$%')
+         ORDER BY buffer_gets_ratio desc ) main
+WHERE rownum <= 20;
 
 ==============================================================================
 ### SQL 찾기
