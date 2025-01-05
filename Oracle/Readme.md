@@ -49,6 +49,6 @@ Script 경로는 계정명에 따라 수정. 여기서는 oracle 과 grid 로 �
 
 ## Grid 계정
 ```
-### Manage log of Grid
+### Manage log of Grid (ashurei@sk.com)
 10 01 * * 0 /home/grid/DBA/script/ManageLog-grid.sh
 ```
