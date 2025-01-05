@@ -6,7 +6,7 @@ Script 경로는 계정명에 따라 수정. 여기서는 oracle 과 grid 로 �
 ### node#1
 ```
 ### Manage log of Oracle (ashurei@sk.com)
-20 01 * * * /home/oracle/DBA/script/ManageLog-oracle.sh
+20 01 * * 0 /home/oracle/DBA/script/ManageLog-oracle.sh
 
 ### Manage archive log (ashurei@sk.com) (only node#2)
 #30 01 * * * /home/oracle/DBA/script/ManageLog-archive.sh
@@ -28,7 +28,7 @@ Script 경로는 계정명에 따라 수정. 여기서는 oracle 과 grid 로 �
 ### node#2
 ```
 ### Manage log of Oracle (ashurei@sk.com)
-20 01 * * * /home/oracle/DBA/script/ManageLog-oracle.sh
+20 01 * * 0 /home/oracle/DBA/script/ManageLog-oracle.sh
 
 ### Manage archive log (ashurei@sk.com) (only node#2)
 30 01 * * * /home/oracle/DBA/script/ManageLog-archive.sh
@@ -50,5 +50,5 @@ Script 경로는 계정명에 따라 수정. 여기서는 oracle 과 grid 로 �
 ## Grid 계정
 ```
 ### Manage log of Grid
-10 01 * * * /home/grid/DBA/script/ManageLog-grid.sh
+10 01 * * 0 /home/grid/DBA/script/ManageLog-grid.sh
 ```
