@@ -1,3 +1,10 @@
+SET HEADING OFF
+SET FEEDBACK OFF
+SET TIME OFF TIMING OFF
+SET lines 5000 PAGES 0
+SET ECHO ON
+SET TERM OFF
+
 SELECT 'tablespace_usage,tablespace=' || t.tn || ' usage_percent=' ||
        to_char( round((t.sizes - f.sizes) /t.sizes * 100,2), 'FM9990.99' ) pct
 FROM    ( SELECT tablespace_name tn,
@@ -11,3 +18,4 @@ FROM    ( SELECT tablespace_name tn,
 WHERE t.tn = f.tn
 ORDER BY Pct desc
 /
+EOF
