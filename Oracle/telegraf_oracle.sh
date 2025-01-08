@@ -7,7 +7,7 @@ SET TERM OFF
 
 COL value for 9999999999999999999999999999
 
-select 'oracle_realtime,host='||y.host_name||',oracle_sid='||y.instance_name||','||x.val
+select 'oracle_realtime,host='||y.host_name||',oracle_sid='||y.instance_name||' '||x.val
   from
   (
     select listagg(stat,',') within group (order by stat) as val
@@ -16,7 +16,7 @@ select 'oracle_realtime,host='||y.host_name||',oracle_sid='||y.instance_name||',
         select replace(replace(replace(name,' ','_'),'(',''),')','')||'='||to_char(value) as stat
           from
           (
-            select name, value from v$sysstat where name in ( 'user calls'
+            select name, value from v\$sysstat where name in ( 'user calls'
                                                             , 'user commits'
                                                             , 'user rollbacks'
                                                             , 'execute count'
@@ -73,21 +73,29 @@ select 'oracle_realtime,host='||y.host_name||',oracle_sid='||y.instance_name||',
                                                             , 'bytes received via SQL*Net from dblink'
                                                             )
             union all
-            select 'seq',nvl(sum(seconds_in_wait),0) from v$session_wait where event ='db file sequential read'
+            select 'seq',nvl(sum(seconds_in_wait),0) from v\$session_wait where event ='db file sequential read'
             union all
-            select 'librarycache_pinhits' as name, sum(pinhits) as value from v$librarycache
+            select 'librarycache_pinhits' as name, sum(pinhits) as value from v\$librarycache
             union all
-            select 'librarycache_pins' as name, sum(pins) as value from v$librarycache
+            select 'librarycache_pins' as name, sum(pins) as value from v\$librarycache
             union all
-            select name, bytes as value from v$sgainfo
+            select name, bytes as value from v\$sgainfo
             union all
-            select lower(status)||'_session' as name, count(*) as value from v$session group by status
+            select lower(status)||'_session' as name, count(*) as value from v\$session group by status
             union all
-            select b.name, sum(a.value) as value from v$sesstat a, v$statname b where a.statistic# = b.statistic# and b.name in ('session pga memory', 'opened cursors current', 'session uga memory') group by b.name
+            select b.name, sum(a.value) as value from v\$sesstat a, v\$statname b where a.statistic# = b.statistic# and b.name in ('session pga memory', 'opened cursors current', 'session uga memory') group by b.name
             union all
-            select 'latch_misses_sum' as name, sum(a.misses) as value from v$latch a
+            select 'latch_misses_sum' as name, sum(a.misses) as value from v\$latch a
             union all
-            select 'latch_gets_sum' as name, sum(a.gets) as value from v$latch a
+            select 'latch_gets_sum' as name, sum(a.gets) as value from v\$latch a
+            union all
+            select 'blocking_session' as name, count(*) as value from v\$session where blocking_session is not null
+            union all
+            select 'buffer_cache_hit_ratio' as name,
+                   round(((1-(sum(decode(name,'physical reads' , value, 0))/
+                             (sum(decode(name,'db block gets'  , value, 0))+
+                             (sum(decode(name,'consistent gets', value, 0)) ))))*100),2) from v\$sysstat
           )
       )
-  ) x, v$instance y;
+  ) x, v\$instance y;
+EOF
