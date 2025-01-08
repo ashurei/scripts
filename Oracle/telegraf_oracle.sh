@@ -1,3 +1,10 @@
+#!/bin/bash
+export ORACLE_BASE=/oracle/database
+export ORACLE_HOME=${ORACLE_BASE}/product/19
+export ORACLE_SID=ORCL1
+SQL="/oracle/backup/telegraf_oracle.sql"
+
+${ORACLE_HOME}/bin/sqlplus -S mon/mon << EOF
 SET HEADING OFF
 SET FEEDBACK OFF
 SET TIME OFF TIMING OFF
