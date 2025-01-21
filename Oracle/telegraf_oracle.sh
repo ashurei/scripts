@@ -1,4 +1,11 @@
 #!/bin/bash
+########################################################
+# Description : Monitor Oracle with telegraf
+# Create DATE : 2025.01.21
+# Last Update DATE : 2025.01.21 by ashurei
+# Copyright (c) ashurei@sktelecom.com, 2025
+########################################################
+
 export ORACLE_BASE=/oracle/database
 export ORACLE_HOME=${ORACLE_BASE}/product/19
 export ORACLE_SID=ORCL1
