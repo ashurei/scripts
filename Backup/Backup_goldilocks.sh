@@ -2,18 +2,18 @@
 ########################################################
 # Description : Goldilocks Hot Backup
 # Create DATE : 2022.07.13
-# Last Update DATE : 2023.02.09 by ashurei
+# Last Update DATE : 2025.01.22 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
-SCRIPT_VER="2023.02.09.r05"
+SCRIPT_VER="2025.01.22.r01"
 TODAY=$(date '+%Y%m%d')
 
 #######################################################
 # Need to modify
-export GOLDILOCKS_HOME="/home/sunje/goldilocks_home"
-export GOLDILOCKS_DATA="/home/sunje/goldilocks_data"
-BACKDIR="/workspace/backup"
+export GOLDILOCKS_HOME="/home/goldUAP/goldilocks_home"
+export GOLDILOCKS_DATA="/home/goldUAP/goldilocks_data"
+BACKDIR="/goldilocks/backup"
 PASSWORD="SKTelecom!2#4"
 #######################################################
 
@@ -86,12 +86,16 @@ function Check_begin () {
 
 ### Get cluster_member_name
 function Get_cluster_member_name () {
-  Cmd_gsql "select cluster_member_name as cmn from dual;"
+  Cmd_gsql "select cluster_member_name as cmn from dual@g1n1;"
 }
 
 ### Check file size
 function Check_size () {
   local file FILES SUM SIZE number
+  
+  # Delete past files
+  Delete_backup
+  
   # Check filesystem size
   SPACE=$(df -k "${TARGETDIR}" | tail -1 | awk '{print $4}')
   Print_log "${TARGETDIR} available size : $((SPACE/1024/1024))GB"
@@ -160,7 +164,7 @@ function Backup_controlfile () {
 ### Backup config files
 function Backup_config () {
   local file FILES
-  FILES=$(Cmd_gsql "select file_name from v\$db_file where file_type='Config File';")
+  FILES=$(Cmd_gsql "select file_name from v\$db_file where file_type='Config File' and file_name like '%.conf';")
 
   for file in $FILES
   do
@@ -280,11 +284,10 @@ Print_log "Backup Start."
 Check_gmaster
 Check_gsql
 Check_archive
-Check_size
 Check_begin
+Check_size
 
 # Backup
-Delete_backup
 Backup_controlfile
 Backup_config
 Backup_datafile
