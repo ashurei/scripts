@@ -1,5 +1,5 @@
 // ashurei@sk.com
-// 2025.03.04.r2
+// 2025.03.05.r6
 
 package oracle
 
@@ -35,8 +35,8 @@ var sampleConfig = `
   #   gather_user_session_count      = true
   #   gather_active_session_count    = true
   #   gather_over_time_query_sec     = true
-  #   gather_lock_info               = true 
-  #   gather_latch_total_count       = true  
+  #   gather_lock_info               = true
+  #   gather_latch_total_count       = true
   #   gather_wait_session_count      = true
   #   gather_transaction_total_count = true
   #   gather_logical_io_total_count  = true
@@ -109,7 +109,7 @@ func (o *Oracle) gatherServer(serv string, acc telegraf.Accumulator) error {
 			acc.AddError(fmt.Errorf("gatherSessionUsage: %s", err))
 		}
 	}
-	
+
 	// 3) gatherActiveSessionCount
 	if o.GatherActiveSessionCount {
 		err = o.gatherActiveSessionCount(db, serv, acc)
@@ -125,7 +125,7 @@ func (o *Oracle) gatherServer(serv string, acc telegraf.Accumulator) error {
 			acc.AddError(fmt.Errorf("gatherBlockingSession: %s", err))
 		}
 	}
-	
+
 	if o.GatherOvertimeQuerySec {
 		err = o.gatherOvertimeQuerySec(db, serv, acc)
 		if err != nil {
@@ -168,7 +168,7 @@ func (o *Oracle) gatherServer(serv string, acc telegraf.Accumulator) error {
 			acc.AddError(fmt.Errorf("gatherBufferCacheHitRatio: %s", err))
 		}
 	}
-	
+
 	// 11) gatherAsmDiskgroupPerc
 	if o.GatherAsmDiskUsePerc {
 		err = o.gatherAsmDiskgroupPerc(db, serv, acc)
@@ -190,7 +190,7 @@ func (o *Oracle) gatherServer(serv string, acc telegraf.Accumulator) error {
 
 // 1) Gather sysstat
 func (o *Oracle) gatherSysstat(db *sql.DB, serv string, acc telegraf.Accumulator) error {
-	query := "select name, value from v$sysstat
+	query := `select name, value from v$sysstat
                where name in ( 'user calls'
                              , 'user commits'
                              , 'user rollbacks'
@@ -246,7 +246,7 @@ func (o *Oracle) gatherSysstat(db *sql.DB, serv string, acc telegraf.Accumulator
                              , 'bytes received via SQL*Net from client'
                              , 'bytes sent via SQL*Net to dblink'
                              , 'bytes received via SQL*Net from dblink'
-            )"
+            ) order by 1`
 
 	rows, err := db.Query(query)
 	if err != nil {
@@ -260,13 +260,13 @@ func (o *Oracle) gatherSysstat(db *sql.DB, serv string, acc telegraf.Accumulator
 	for rows.Next() {
 		var (
 			name string
-			value int64
+			value float64
 		)
-		if err := rows.Scan(&name, &cnt); err != nil {
+		if err := rows.Scan(&name, &value); err != nil {
 			return err
 		}
 		tags["name"] = name
-		fields["oracle_wait_session_count"] = value
+		fields["oracle_wait_session_count"] = uint64(value)
 	}
 	acc.AddFields("oracle", fields, tags)
 
@@ -308,7 +308,7 @@ func (o *Oracle) gatherActiveSessionCount(db *sql.DB, serv string, acc telegraf.
 	tags := map[string]string{"server": servtag}
 	fields := map[string]interface{}{}
 	for rows.Next() {
-		var (cnt int64)
+		var (cnt uint64)
 		if err := rows.Scan(&cnt); err != nil {
 			return err
 		}
@@ -331,7 +331,7 @@ func (o *Oracle) gatherBlockingSession(db *sql.DB, serv string, acc telegraf.Acc
 	tags := map[string]string{"server": servtag}
 	fields := map[string]interface{}{}
 	for rows.Next() {
-		var (cnt int64)
+		var (cnt uint64)
 		if err := rows.Scan(&cnt); err != nil {
 			return err
 		}
@@ -523,7 +523,7 @@ func (o *Oracle) gatherPysicalIoTotalCount(db *sql.DB, serv string, acc telegraf
 func (o *Oracle) gatherBufferCacheHitRatio(db *sql.DB, serv string, acc telegraf.Accumulator) error {
 	// Buffer_Cache_Hit_Ratio
 	query := `select round(1-((c.value-d.value)/((a.value+b.value)-(d.value))),4)*100 pct
-	            from v$sysstat a, v$sysstat b, v$sysstat c, v$sysstat d  
+	            from v$sysstat a, v$sysstat b, v$sysstat c, v$sysstat d
 	           where a.name = 'consistent gets'
 	             and b.name = 'db block gets'
 	             and c.name = 'physical reads'
@@ -553,7 +553,7 @@ func (o *Oracle) gatherBufferCacheHitRatio(db *sql.DB, serv string, acc telegraf
 
 // 11) Gather asm_diskgroup_perc
 func (o *Oracle) gatherAsmDiskgroupPerc(db *sql.DB, serv string, acc telegraf.Accumulator) error {
-	rows, err := db.Query("select name, 100-round(free_mb / total_mb * 100, 0) pct from v$asm_diskgroup order by 2 desc")	
+	rows, err := db.Query("select name, 100-round(free_mb / total_mb * 100, 2) pct from v$asm_diskgroup order by 2 desc")
 	if err != nil {
 		return err
 	}
