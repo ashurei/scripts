@@ -1,5 +1,5 @@
 // ashurei@sk.com
-// 2025.03.05.r6
+// 2025.03.10.r5
 
 package oracle
 
@@ -15,35 +15,37 @@ import (
 
 type Oracle struct {
 	Servers                     []string `toml:"servers"`
-	GatherUserSessionCount      bool     `toml:"gather_user_session_count"`
+	GatherSysstat               bool     `toml:"gather_sysstat"`
+	GatherSessionUsage          bool     `toml:"gather_session_usage"`
 	GatherActiveSessionCount    bool     `toml:"gather_active_session_count"`
+	GatherBlockingSession       bool     `toml:"gather_block_session_count"`
+	GatherBufferCacheHitRatio   bool     `toml:"gather_buffer_cache_hit_ratio"`
+	GatherTablespaceUsage       bool     `toml:"gather_tablespace_usage"`
+	GatherAsmDiskUseUsage       bool     `toml:"gather_asm_diskgroup_usage"`
+	
 	GatherOvertimeQuerySec      bool     `toml:"gather_over_time_query_sec"`
-	GatherLatchTotalCount       bool     `toml:"gather_latch_total_count"`
-	GatherWaitSessionCount      bool     `toml:"gather_wait_session_count"`
-	GatherTransactionTotalCount bool     `toml:"gather_transaction_total_count"`
+	GatherLatchTotalCount       bool     `toml:"gather_latch_total_count"`	
 	GatherLogicalIoTotalCount   bool     `toml:"gather_logical_io_total_count"`
-	GatherPysicalIoTotalCount   bool     `toml:"gather_physical_io_total_count"`
-	GatherAsmDiskUsePerc        bool     `toml:"gather_asm_disk_use_perc"`
-	GatherTablespacePerc        bool     `toml:"gather_tablespace_perc"`
+	GatherPysicalIoTotalCount   bool     `toml:"gather_physical_io_total_count"`	
 	GatherLockQueryMsec         bool     `toml:"gather_lock_info"`
-	GatherLockQueryCount        bool     `toml:"gather_lock_count"`
 }
 
-var sampleConfig = `
+const sampleConfig = `
   servers = ["system/HelloOra@10.211.55.11:1521/ORCL"]
 
-  #   gather_user_session_count      = true
+  #   gather_sysstat                 = true  
+  #   gather_session_usage           = true
   #   gather_active_session_count    = true
+  #   gather_block_session_count     = true
+  #   gather_buffer_cache_hit_ratio  = true
+  #   gather_tablespace_usage        = true
+  #   gather_asm_diskgroup_usage     = true
+    
   #   gather_over_time_query_sec     = true
   #   gather_lock_info               = true
   #   gather_latch_total_count       = true
-  #   gather_wait_session_count      = true
-  #   gather_transaction_total_count = true
   #   gather_logical_io_total_count  = true
   #   gather_physical_io_total_count = true
-  #   gather_asm_disk_use_perc       = true
-  #   gather_tablespace_perc         = true
-  #   gather_lock_count              = true
 `
 
 func (o *Oracle) SampleConfig() string {
@@ -71,16 +73,11 @@ func (o *Oracle) Gather(acc telegraf.Accumulator) error {
 		wg.Add(1)
 		go func(s string) {
 			defer wg.Done()
-			fmt.Println("server=%s", s)
-			err := o.gatherServer(s, acc)
-			if err != nil {
-				acc.AddError(err)
-			}
+			acc.AddError(o.gatherServer(s, acc))
 		}(server)
 	}
 
 	wg.Wait()
-
 	//o.gatherServer(o.Servers[0], acc)
 
 	return nil
@@ -95,7 +92,7 @@ func (o *Oracle) gatherServer(serv string, acc telegraf.Accumulator) error {
 	defer db.Close()
 
 	// 1) gatherSysstat
-	if o.GatherWaitSessionCount {
+	if o.GatherSysstat {
 		err = o.gatherSysstat(db, serv, acc)
 		if err != nil {
 			acc.AddError(fmt.Errorf("gatherSysstat: %s", err))
@@ -103,7 +100,7 @@ func (o *Oracle) gatherServer(serv string, acc telegraf.Accumulator) error {
 	}
 
 	// 2) gatherSessionUsage
-	if o.GatherUserSessionCount {
+	if o.GatherSessionUsage {
 		err = o.gatherSessionUsage(db, serv, acc)
 		if err != nil {
 			acc.AddError(fmt.Errorf("gatherSessionUsage: %s", err))
@@ -119,10 +116,34 @@ func (o *Oracle) gatherServer(serv string, acc telegraf.Accumulator) error {
 	}
 
 	// 4) gatherBlockingSession
-	if o.GatherLockQueryCount {
+	if o.GatherBlockingSession {
 		err = o.gatherBlockingSession(db, serv, acc)
 		if err != nil {
 			acc.AddError(fmt.Errorf("gatherBlockingSession: %s", err))
+		}
+	}
+	
+	// 5) gatherBufferCacheHitRatio
+	if o.GatherBufferCacheHitRatio {
+		err = o.gatherBufferCacheHitRatio(db, serv, acc)
+		if err != nil {
+			acc.AddError(fmt.Errorf("gatherBufferCacheHitRatio: %s", err))
+		}
+	}
+
+	// 6) gatherTableSpaceUsage
+	if o.GatherTablespaceUsage {
+		err = o.gatherTableSpaceUsage(db, serv, acc)
+		if err != nil {
+			acc.AddError(fmt.Errorf("gatherTableSpaceUsage: %s", err))
+		}
+	}
+	
+	// 7) gatherAsmDiskgroupUsage
+	if o.GatherAsmDiskUseUsage {
+		err = o.gatherAsmDiskgroupUsage(db, serv, acc)
+		if err != nil {
+			acc.AddError(fmt.Errorf("gatherAsmDiskgroupUsage: %s", err))
 		}
 	}
 
@@ -158,30 +179,6 @@ func (o *Oracle) gatherServer(serv string, acc telegraf.Accumulator) error {
 		err = o.gatherPysicalIoTotalCount(db, serv, acc)
 		if err != nil {
 			acc.AddError(fmt.Errorf("PysicalIoTotalCount: %s", err))
-		}
-	}
-
-	// 10) gatherBufferCacheHitRatio
-	if o.GatherTransactionTotalCount {
-		err = o.gatherBufferCacheHitRatio(db, serv, acc)
-		if err != nil {
-			acc.AddError(fmt.Errorf("gatherBufferCacheHitRatio: %s", err))
-		}
-	}
-
-	// 11) gatherAsmDiskgroupPerc
-	if o.GatherAsmDiskUsePerc {
-		err = o.gatherAsmDiskgroupPerc(db, serv, acc)
-		if err != nil {
-			acc.AddError(fmt.Errorf("gatherAsmDiskgroupPerc: %s", err))
-		}
-	}
-
-	// 12) gatherTableSpacePerc
-	if o.GatherTablespacePerc {
-		err = o.gatherTableSpacePerc(db, serv, acc)
-		if err != nil {
-			acc.AddError(fmt.Errorf("gatherTableSpacePerc: %s", err))
 		}
 	}
 
@@ -256,7 +253,8 @@ func (o *Oracle) gatherSysstat(db *sql.DB, serv string, acc telegraf.Accumulator
 
 	servtag := getDSNTag(serv)
 	tags := map[string]string{"server": servtag}
-	fields := map[string]interface{}{}
+	fields := make(map[string]interface{})
+	name_replace := ""
 	for rows.Next() {
 		var (
 			name string
@@ -265,9 +263,14 @@ func (o *Oracle) gatherSysstat(db *sql.DB, serv string, acc telegraf.Accumulator
 		if err := rows.Scan(&name, &value); err != nil {
 			return err
 		}
-		tags["name"] = name
-		fields["oracle_wait_session_count"] = uint64(value)
+		// Replace " " to "_"
+		name_replace = strings.Replace(name, " ", "_", -1)
+		fields[name_replace] = uint64(value)
+		
+		// debug
+		//acc.AddError(fmt.Errorf("name_replace / field: %s / %d", name_replace, fields[name_replace]))
 	}
+	
 	acc.AddFields("oracle", fields, tags)
 
 	return nil
@@ -289,9 +292,9 @@ func (o *Oracle) gatherSessionUsage(db *sql.DB, serv string, acc telegraf.Accumu
 		if err := rows.Scan(&session_ratio); err != nil {
 			return err
 		}
-		fields["oracle_user_session_count"] = session_ratio
+		fields["oracle_session_usage"] = session_ratio
+		acc.AddFields("oracle", fields, tags)
 	}
-	acc.AddFields("oracle", fields, tags)
 
 	return nil
 }
@@ -313,8 +316,8 @@ func (o *Oracle) gatherActiveSessionCount(db *sql.DB, serv string, acc telegraf.
 			return err
 		}
 		fields["oracle_active_session_count"] = cnt
+		acc.AddFields("oracle", fields, tags)
 	}
-	acc.AddFields("oracle", fields, tags)
 
 	return nil
 }
@@ -335,9 +338,112 @@ func (o *Oracle) gatherBlockingSession(db *sql.DB, serv string, acc telegraf.Acc
 		if err := rows.Scan(&cnt); err != nil {
 			return err
 		}
-		fields["oracle_lock_query_count"] = cnt
+		fields["oracle_block_session_count"] = cnt
+		acc.AddFields("oracle", fields, tags)
 	}
-	acc.AddFields("oracle", fields, tags)
+
+	return nil
+}
+
+// 5) Gather Buffer_Cache_Hit_Ratio
+func (o *Oracle) gatherBufferCacheHitRatio(db *sql.DB, serv string, acc telegraf.Accumulator) error {
+	// Buffer_Cache_Hit_Ratio
+	query := `select round(1-((c.value-d.value)/((a.value+b.value)-(d.value))),4)*100 pct
+	            from v$sysstat a, v$sysstat b, v$sysstat c, v$sysstat d
+	           where a.name = 'consistent gets'
+	             and b.name = 'db block gets'
+	             and c.name = 'physical reads'
+	             and d.name = 'physical reads direct'`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	servtag := getDSNTag(serv)
+	tags := map[string]string{"server": servtag}
+	fields := map[string]interface{}{}
+	for rows.Next() {
+		var pct float64
+		if err := rows.Scan(&pct); err != nil {
+			return err
+		}
+
+		fields["oracle_buffer_cache_hit_ratio"] = pct
+		acc.AddFields("oracle", fields, tags)
+	}
+
+	return nil
+}
+
+// 6) Gather tablespace usage
+func (o *Oracle) gatherTableSpaceUsage(db *sql.DB, serv string, acc telegraf.Accumulator) error {
+	query := `SELECT t.tn "name"
+	                ,round((t.sizes - f.sizes) /t.sizes * 100,2) "pct"
+	            FROM ( SELECT tablespace_name tn
+	                         ,sum(bytes)/1024/1024 Sizes
+	                     FROM dba_data_files
+	                    GROUP BY tablespace_name) t,
+	                 ( SELECT tablespace_name tn
+	                         ,sum(bytes)/1024/1024 sizes
+	                     FROM dba_free_space
+	                    GROUP BY tablespace_name) f
+	           WHERE t.tn = f.tn
+	           ORDER BY "pct" desc`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	servtag := getDSNTag(serv)
+	tags := map[string]string{"server": servtag}
+	fields := map[string]interface{}{}
+	for rows.Next() {
+		var (
+			name string
+			pct  float64
+		)
+
+		if err := rows.Scan(&name, &pct); err != nil {
+			return err
+		}
+
+		tags["name"] = name
+		fields["oracle_tablespace_usage"] = pct
+		acc.AddFields("oracle", fields, tags)
+	}
+
+	return nil
+}
+
+// 7) Gather asm_diskgroup_usage
+func (o *Oracle) gatherAsmDiskgroupUsage(db *sql.DB, serv string, acc telegraf.Accumulator) error {
+	rows, err := db.Query("select name, 100-round(free_mb / total_mb * 100, 2) pct from v$asm_diskgroup order by 2 desc")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	servtag := getDSNTag(serv)
+	tags := map[string]string{"server": servtag}
+	fields := map[string]interface{}{}
+	for rows.Next() {
+		var (
+			name string
+			pct float64
+		)
+
+		if err := rows.Scan(&name, &pct); err != nil {
+			return err
+		}
+
+		tags["name"] = name
+		fields["oracle_asm_diskgroup_usage"] = pct
+		acc.AddFields("oracle", fields, tags)
+	}	
 
 	return nil
 }
@@ -382,9 +488,8 @@ func (o *Oracle) gatherOvertimeQuerySec(db *sql.DB, serv string, acc telegraf.Ac
 
 		tags["sql_id"] = sqlID
 		fields["oracle_overtime_query_sec"] = timeS
+		acc.AddFields("oracle", fields, tags)
 	}
-
-	acc.AddFields("oracle", fields, tags)
 
 	return nil
 }
@@ -423,9 +528,8 @@ func (o *Oracle) gatherLockQueryMsec(db *sql.DB, serv string, acc telegraf.Accum
 
 		tags["sql_id"] = sqlID
 		fields["oracle_lock_query_msec"] = timeS
+		acc.AddFields("oracle", fields, tags)
 	}
-
-	acc.AddFields("oracle", fields, tags)
 
 	return nil
 }
@@ -453,8 +557,8 @@ func (o *Oracle) gatherLatchTotalCount(db *sql.DB, serv string, acc telegraf.Acc
 		}
 
 		fields["oracle_latch_total_count"] = cnt
+		acc.AddFields("oracle", fields, tags)
 	}
-	acc.AddFields("oracle", fields, tags)
 
 	return nil
 }
@@ -482,8 +586,8 @@ func (o *Oracle) gatherLogicalIoTotalCount(db *sql.DB, serv string, acc telegraf
 		}
 
 		fields["oracle_logical_io_total_count"] = value
+		acc.AddFields("oracle", fields, tags)
 	}
-	acc.AddFields("oracle", fields, tags)
 
 	return nil
 }
@@ -494,8 +598,6 @@ func (o *Oracle) gatherPysicalIoTotalCount(db *sql.DB, serv string, acc telegraf
 
 	rows, err := db.Query(query)
 	if err != nil {
-		//fmt.Println("Error fetching addition")
-		//fmt.Println(err)
 		return err
 	}
 	defer rows.Close()
@@ -513,111 +615,8 @@ func (o *Oracle) gatherPysicalIoTotalCount(db *sql.DB, serv string, acc telegraf
 		}
 
 		fields["oracle_physical_io_total_count"] = value
+		acc.AddFields("oracle", fields, tags)
 	}
-	acc.AddFields("oracle", fields, tags)
-
-	return nil
-}
-
-// 10) Gather Buffer_Cache_Hit_Ratio
-func (o *Oracle) gatherBufferCacheHitRatio(db *sql.DB, serv string, acc telegraf.Accumulator) error {
-	// Buffer_Cache_Hit_Ratio
-	query := `select round(1-((c.value-d.value)/((a.value+b.value)-(d.value))),4)*100 pct
-	            from v$sysstat a, v$sysstat b, v$sysstat c, v$sysstat d
-	           where a.name = 'consistent gets'
-	             and b.name = 'db block gets'
-	             and c.name = 'physical reads'
-	             and d.name = 'physical reads direct'`
-
-	rows, err := db.Query(query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	servtag := getDSNTag(serv)
-	tags := map[string]string{"server": servtag}
-	fields := map[string]interface{}{}
-	for rows.Next() {
-		var pct float64
-		if err := rows.Scan(&pct); err != nil {
-			return err
-		}
-
-		fields["oracle_transaction_total_count"] = pct
-	}
-	acc.AddFields("oracle", fields, tags)
-
-	return nil
-}
-
-// 11) Gather asm_diskgroup_perc
-func (o *Oracle) gatherAsmDiskgroupPerc(db *sql.DB, serv string, acc telegraf.Accumulator) error {
-	rows, err := db.Query("select name, 100-round(free_mb / total_mb * 100, 2) pct from v$asm_diskgroup order by 2 desc")
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	servtag := getDSNTag(serv)
-	tags := map[string]string{"server": servtag}
-	fields := map[string]interface{}{}
-	for rows.Next() {
-		var (
-			name string
-			pct float64
-		)
-
-		if err := rows.Scan(&name, &pct); err != nil {
-			return err
-		}
-
-		tags["name"] = name
-		fields["oracle_asm_disk_use_perc"] = pct
-	}
-	acc.AddFields("oracle", fields, tags)
-
-	return nil
-}
-
-// 12) Gather tablespace usage
-func (o *Oracle) gatherTableSpacePerc(db *sql.DB, serv string, acc telegraf.Accumulator) error {
-	query := `SELECT t.tn "name"
-	                ,round((t.sizes - f.sizes) /t.sizes * 100,2) "pct"
-	            FROM ( SELECT tablespace_name tn
-	                         ,sum(bytes)/1024/1024 Sizes
-	                     FROM dba_data_files
-	                    GROUP BY tablespace_name) t,
-	                 ( SELECT tablespace_name tn
-	                         ,sum(bytes)/1024/1024 sizes
-	                     FROM dba_free_space
-	                    GROUP BY tablespace_name) f
-	           WHERE t.tn = f.tn
-	           ORDER BY "pct" desc`
-
-	rows, err := db.Query(query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	servtag := getDSNTag(serv)
-	tags := map[string]string{"server": servtag}
-	fields := map[string]interface{}{}
-	for rows.Next() {
-		var (
-			name string
-			pct  float64
-		)
-
-		if err := rows.Scan(&name, &pct); err != nil {
-			return err
-		}
-
-		tags["name"] = name
-		fields["oracle_tablespace_perc"] = pct
-	}
-	acc.AddFields("oracle", fields, tags)
 
 	return nil
 }
@@ -625,18 +624,18 @@ func (o *Oracle) gatherTableSpacePerc(db *sql.DB, serv string, acc telegraf.Accu
 func init() {
 	inputs.Add("oracle", func() telegraf.Input {
 		return &Oracle{
-			GatherWaitSessionCount:      true,
-			GatherUserSessionCount:      true,
+			GatherSysstat:               true,
+			GatherSessionUsage:          true,
 			GatherActiveSessionCount:    true,
-			GatherLockQueryCount:        true,
+			GatherBlockingSession:       true,
+			GatherBufferCacheHitRatio:   true,
+			GatherTablespaceUsage:       true,
+			GatherAsmDiskUseUsage:       true,
 			//GatherOvertimeQuerySec:      true,
 			//GatherLatchTotalCount:       true,
 			//GatherLogicalIoTotalCount:   true,
 			//GatherPysicalIoTotalCount:   true,
 			//GatherLockQueryMsec:         true,
-			GatherTransactionTotalCount: true,
-			GatherAsmDiskUsePerc:        true,
-			GatherTablespacePerc:        true,
 		}
 	})
 }
