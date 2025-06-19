@@ -24,10 +24,10 @@ begin
       LEAVE read_loop;
     END IF;
 
-        SET @sql = CONCAT('ALTER TABLE ', v_dbname, '.', v_tablename, ' DROP PARTITION ', v_partition, ';');
-        prepare stmt from @sql;
-        execute stmt;
-        deallocate prepare stmt;
+    SET @sql = CONCAT('ALTER TABLE ', v_dbname, '.', v_tablename, ' DROP PARTITION ', v_partition, ';');
+    prepare stmt from @sql;
+    execute stmt;
+    deallocate prepare stmt;
   end loop;
 
   close cur;
