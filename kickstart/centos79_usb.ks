@@ -1,9 +1,8 @@
-#!/bin/bash
 ########################################################
-# Description : kickstart config file
-# Create DATE : 2021.03.05
-# Last Update DATE : 2021.03.19 by ashurei
-# Copyright (c) Technical Solution, 2020
+# Description : Kickstart for Redhat Linux 7.9
+# Create DATE : 2022.09.15
+# Last Update DATE : 2025.06.25 by ashurei
+# Copyright (c) ashurei@sktelecom.com, 2024
 ########################################################
 
 install
@@ -21,99 +20,86 @@ timezone Asia/Seoul
 poweroff
 %include /tmp/part-include
 
-%pre --log=/mnt/sysimage/root/ks-pre.log
+### Create Partition ============================================================================= #
+%pre --log=/tmp/ks-pre.log
 #!/bin/bash
-BOOTSIZE=1024		# /boot 2G
-ROOTSIZE=20480		# /     20G
-USRSIZE=20480		# /usr  20G
-VARSIZE=36864		# /var  36G
-HOMESIZE=20480		# /home 20G
+DISK="sda"
+BOOTSIZE=2048      # /boot       2GB
+EFISIZE=200        # /boot/efi 200MB
+ROOTSIZE=153600    # /         150GB
 
-GatherSizing() {
-	MEM_MB=$(grep MemTotal /proc/meminfo | awk '{printf("%d"), $2/1024}')
-	
-	# /var/crash (Max 64GB)
-	if [ ${MEM_MB} -ge 66000 ]
-	then
-		CRASHSIZE=65536
-	else
-		CRASHSIZE=$MEM_MB
-	fi
-
-	# swap (Max 8GB)
-	if [ ${MEM_MB} -le 2048 ]
-	then
-		SWAPSIZE=$((${MEM_MB} * 2))
-	else
-		SWAPSIZE=8192
-	fi
-}
-Clearing () {
-    echo "zerombr" >> /tmp/part-include
-    echo "ignoredisk --only-use sda" >> /tmp/part-include
-    echo "clearpart --initlabel --all" >> /tmp/part-include
-}
-PartitioningEfiBoot () {
-    echo "bootloader --location partition --driveorder sda" >> /tmp/part-include
-    echo "part /boot --fstype xfs --size $BOOTSIZE --asprimary" >> /tmp/part-include
-    echo "part /boot/efi --fstype vfat --size 256 --asprimary" >> /tmp/part-include
-    echo "part swap --fstype swap --size $SWAPSIZE" >> /tmp/part-include
-}
-PartitioningLegacyBoot () {
-    echo "bootloader --location mbr --driveorder sda" >> /tmp/part-include
-    echo "part /boot --fstype xfs --size $BOOTSIZE --asprimary" >> /tmp/part-include
-    echo "part swap --fstype swap --size $SWAPSIZE --asprimary" >> /tmp/part-include
-}
-PartitioningCommon () {
-    echo "part / --fstype xfs --size $ROOTSIZE --asprimary" >> /tmp/part-include
-    echo "part /usr --fstype xfs --size $USRSIZE" >> /tmp/part-include
-	echo "part /var --fstype xfs --size $VARSIZE" >> /tmp/part-include
-    echo "part /var/crash --fstype xfs --size $CRASHSIZE" >> /tmp/part-include
-    echo "part /home --fstype xfs --size $HOMESIZE" >> /tmp/part-include
-    echo "part pv.253005 --grow --size=200" >> /tmp/part-include
+# Gather size for SWAP
+function GatherSizing() {
+  MEM_MB=$(grep MemTotal /proc/meminfo | awk '{printf("%d"), $2/1024}')
+  # swap (Max 8GB)
+  if [ ${MEM_MB} -le 2048 ]
+  then
+    SWAPSIZE=$((${MEM_MB} * 2))
+  else
+    SWAPSIZE=8192
+  fi
 }
 
-GatherSizing;
-Clearing;
-if [ -d /sys/firmware/efi ]
+# Get disk for install bootloader (Against USB is mounted to /dev/sda)
+DISK=$(blkid | grep -Ev 'sr0|loop|mapper|run|vfat|zram0' | awk -F'/|:' '{print $3}' | sed 's/[^a-z]//g' | sort | head -1)
+# If $DISK is null set "sda"
+if [ -z "$DISK" ]
 then
-	PartitioningEfiBoot;
-	PartitioningCommon;
-else
-	PartitioningLegacyBoot;
-	PartitioningCommon;
+  DISK="sda"
 fi
+
+GatherSizing
+echo "zerombr" > /tmp/part-include
+echo "ignoredisk --only-use=${DISK}" >> /tmp/part-include
+echo "clearpart --all --initlabel" >> /tmp/part-include
+echo "bootloader --location=mbr --driveorder=${DISK}" >> /tmp/part-include
+echo "part /boot --fstype=xfs --size=${BOOTSIZE}" >> /tmp/part-include
+
+# Check EFI mode
+if [ -d "/sys/firmware/efi" ]
+then
+  echo "part /boot/efi --fstype=efi --size=${EFISIZE}" >> /tmp/part-include
+fi
+
+echo "part swap --fstype=swap --size=${SWAPSIZE}" >> /tmp/part-include
+echo "part / --fstype=xfs --size=${ROOTSIZE}" >> /tmp/part-include
+
 %end
 
-%packages --nobase
-ethtool
+
+### Tasks after partitioned with nochroot ======================================================== #
+%pre-install --log=/mnt/sysimage/root/ks-pre-install.log
+# Copy RPM
+TARGET="/mnt/sysimage/root"
+df -hT
+cp -r /run/install/repo/custom/rpm ${TARGET}/
+chmod 644 ${TARGET}/rpm/*.rpm
+%end
+
+
+### Install packages ============================================================================= #
+%packages --ignoremissing
+@^minimal-environment
 gcc
 krb5-devel
-ksh
-lvm2
 man-pages
 man-pages-overrides
 net-tools
-ntp
-ntpdate
-openssh-clients
+#ksh
 openssl-devel
-pciutils
+-postfix
 perl
-rpcbind
-sos
+#rpcbind
+#sos
 sysstat
-tcp_wrappers
-unzip
 vim-enhanced
-xinetd
-zip
+#xinetd
 zlib-devel
 %end
 
-%post --log=/mnt/sysimage/root/ks-post.log
 
 # Post-Installation ============================================================================= #
+%post --log=/root/ks-post.log
 #!/bin/bash
 ##### /etc/security/limits.conf #####
 cat << EOF >> /etc/security/limits.conf
@@ -135,10 +121,16 @@ sed -i 's/\*\/10/\*\/1/' /etc/cron.d/sysstat
 mkdir -p /etc/yum.repos.d/org
 mv /etc/yum.repos.d/CentOS-* /etc/yum.repos.d/org/
 cat << EOF > /etc/yum.repos.d/local.repo
-[Server]
-name=Server
-baseurl=file:///media/
-enabled=0
+[base-tb-ossrepo]
+name=CentOS-$releasever - Base
+baseurl=http://60.30.131.100/repos/centos/7/os/x86_64
+enabled=1
+gpgcheck=0
+
+[updates-tb-ossrepo]
+name=CentOS-$releasever - Updates
+baseurl=http://60.30.131.100/repos/centos/7/updates/x86_64
+enabled=1
 gpgcheck=0
 EOF
 
@@ -155,31 +147,17 @@ sed -i 's/\#UseDNS yes/UseDNS no/' /etc/ssh/sshd_config
 echo "MTU=1500" >> /etc/sysconfig/network-scripts/ifcfg-lo
 
 
-##### Install additional rpm
-mount LABEL=CENT79 /media
-rpm -ivh /media/kernel-3.10.0-1160.15.2.el7.x86_64.rpm
-rpm -Uvh /media/kernel-devel-3.10.0-1160.15.2.el7.x86_64.rpm
-rpm -Uvh /media/kernel-headers-3.10.0-1160.15.2.el7.x86_64.rpm
-rpm -Uvh /media/kernel-tools-3.10.0-1160.15.2.el7.x86_64.rpm kernel-tools-libs-3.10.0-1160.15.2.el7.x86_64.rpm
-rpm -ivh /media/ssacli-4.21-7.0.x86_64.rpm
-umount /media
+##### Kernel patch #####
+RPMDIR="/root/rpm"
+rpm -ivh ${RPMDIR}/kernel-3.10.0-1160.108.1.el7.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-devel-3.10.0-1160.108.1.el7.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-headers-3.10.0-1160.108.1.el7.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-tools-3.10.0-1160.108.1.el7.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-tools-libs-devel-3.10.0-1160.108.1.el7.x86_64.rpm
 
 
-##### cmdline #####
-# numa=off, transparent_hugepage=never, ipv6_disable=1 (intel_idle.max_cstate=0, processor.max_cstate=1, intel_pstate=disable)
-sed -i '/GRUB_CMDLINE_LINUX/ {s/\"$/ numa=off transparent_hugepage=never ipv6.disable=1\"/}' /etc/default/grub
 
-
-##### postfix for ipv6 disable #####
-sed -i '/inet_protocols/ {s/all/IPv4/}' /etc/postfix/main.cf
-
-
-##### IRQBALANCE_ONESHOT #####
-sed -i 's/#IRQBALANCE_ONESHOT=/IRQBALANCE_ONESHOT=yes/' /etc/sysconfig/irqbalance
-
-
-# Security ====================================================================================== #
-
+# [ Security ]
 ##### Set Banner File #####
 cat << EOF > /etc/issue
  #####################################################################
@@ -201,14 +179,18 @@ cat << EOF > /etc/issue
 EOF
 cat /etc/issue > /etc/issue.net
 
+sed -i '/^#smtpd_banner/s/^#//g' /etc/postfix/main.cf
+
 
 ##### Delete not using user #####
+mkdir /root/backup
 cp /etc/passwd /root/backup/passwd.org
 sed -i 's/lp/#lp/'             /etc/passwd
 sed -i 's/shutdown/#shutdown/' /etc/passwd
 sed -i 's/operator/#operator/' /etc/passwd
 sed -i 's/sync/#sync/'         /etc/passwd
 sed -i 's/halt/#halt/'         /etc/passwd
+sed -i 's/ftp/#ftp/'           /etc/passwd
 
 
 ##### Add "suser" #####
@@ -220,20 +202,19 @@ echo -e 'suser\tALL=(ALL)\tNOPASSWD:ALL' > /etc/sudoers.d/suser
 ##### Passwd policy with /etc/login.defs #####
 # PASS_MAX_DAYS   70
 # PASS_MIN_DAYS   7
-# PASS_MIN_LEN    8
+# PASS_MIN_LEN    10
 sed -i '/^PASS_MAX_DAYS/ {s/[0-9]\{1,\}/70/}' /etc/login.defs
 sed -i '/^PASS_MIN_DAYS/ {s/[0-9]\{1,\}/7/}' /etc/login.defs
-sed -i '/^PASS_MIN_LEN/  {s/[0-9]\{1,\}/8/}' /etc/login.defs
+sed -i '/^PASS_MIN_LEN/  {s/[0-9]\{1,\}/9/}' /etc/login.defs
 echo SULOG_FILE /var/log/sulog >> /etc/login.defs
 
 
 ##### FTP configuration #####
 ISFTP=$(rpm -q vsftpd | grep -E 'vsftpd-[0-9]')
-if [ "${ISFTP}" -eq 1 ]
+if [ -n "${ISFTP}" ]
 then
 	sed -i '/anonymous_enable/ {s/YES/NO/}' /etc/vsftpd/vsftpd.conf
 	sed -i 's/#ftpd_banner=Welcome to blah FTP service/ftpd_banner=WARNING:Authorized use only/' /etc/vsftpd/vsftpd.conf
-	sed -i '/listen_ipv6/ {s/YES/NO/}' /etc/vsftpd/vsftpd.conf
 fi
 
 
@@ -243,9 +224,11 @@ chmod 000 /etc/hosts.equiv
 touch /root/.rhosts
 chmod 000 /root/.rhosts
 chmod 640 /etc/rsyslog.conf
-chown -R root. /var/log/cups
+#chown -R root. /var/log/cups
 chown root.wheel /bin/su
 chmod 4750 /bin/su
+chmod -s /usr/bin/newgrp
+chmod -s /sbin/unix_chkpwd
 
 
 ##### SSH root access configuration #####
@@ -267,16 +250,21 @@ sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_ti
 sed -i '10 a\account     required      pam_tally2.so magic_root' ${PASSWD_AUTH}
 sed -i '/pam_faildelay/ {s/^/#/}' ${PASSWD_AUTH}
 
+# su
+sed -i '/pam_wheel.so use_uid/s/^#//' /etc/pam.d/su
+
 
 ##### kdump settings #####
 sed -i '/^core_collector/ {s/-l/-c/}' /etc/kdump.conf
 
 
 ##### /etc/profile #####
+sed -i '/umask/s/002/022/g' /etc/profile
+sed -i '/umask/s/002/022/g' /etc/bashrc
+
 cat << EOF >> /etc/profile
 
 # Added for SKT
-umask 0022
 export HISTSIZE=5000
 export HISTTIMEFORMAT='%F %T '
 export TMOUT=300
@@ -286,10 +274,13 @@ EOF
 
 
 ##### /etc/logrotate.conf #####
-sed -i 's/^weekly/monthly/;s/rotate\ 4/rotate\ 12/;s/rotate\ 1$/rotate\ 12/' /etc/logrotate.conf
-sed -i 's/0664/0600/' /etc/logrotate.conf
+sed -i 's/^weekly/monthly/;s/rotate\ 4/rotate\ 12/' /etc/logrotate.conf
+sed -i 's/0664/0600/'                               /etc/logrotate.conf
 
-exit
+
+##### Disable service
+systemctl disable rpcbind
+systemctl disable postfix
+
 exit
 %end
-
