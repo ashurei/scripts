@@ -250,10 +250,13 @@ sed -i '/^core_collector/ {s/-l/-c/}' /etc/kdump.conf
 
 
 ##### /etc/profile #####
+##### /etc/profile #####
+sed -i '/umask/s/002/022/g' /etc/profile
+sed -i '/umask/s/002/022/g' /etc/bashrc
+
 cat << EOF >> /etc/profile
 
 # Added for SKT
-umask 0022
 export HISTSIZE=5000
 export HISTTIMEFORMAT='%F %T '
 export TMOUT=300
