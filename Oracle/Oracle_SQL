@@ -633,7 +633,10 @@ drop table <OWNER_NAME>.<JOB_NAME>;
 drop table SYSTEM.IMPDP_SSADBC;
 
 # Datapump 모니터링
-SELECT OPNAME, TARGET_DESC, SOFAR, TOTALWORK, (SOFAR/TOTALWORK*100) PER FROM V$SESSION_LONGOPS;
+set line 200 pages 1000
+col opname for a20
+col target_desc for a15
+SELECT OPNAME, TARGET_DESC, SOFAR, TOTALWORK, round((SOFAR/TOTALWORK*100),2) PER FROM V$SESSION_LONGOPS order by per desc;
 ==================================================================================
 
 
