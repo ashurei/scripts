@@ -634,8 +634,8 @@ drop table SYSTEM.IMPDP_SSADBC;
 
 # Datapump 모니터링
 set line 200 pages 1000
-col opname for a20
-col target_desc for a15
+col opname for a40
+col target_desc for a40
 SELECT OPNAME, TARGET_DESC, SOFAR, TOTALWORK, round((SOFAR/TOTALWORK*100),2) PER FROM V$SESSION_LONGOPS order by per desc;
 ==================================================================================
 
