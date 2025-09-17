@@ -1,0 +1,70 @@
+### 2025.09.17 Created by ashurei@sk.com
+---
+- name: keyword scan
+  hosts: all
+  gather_facts: false
+  vars:
+    scan_path: /tmp/keyword_scan
+  tasks:
+### Get python path and verversion
+  - name: Get python
+    shell: ls /usr/bin/ | grep -E 'python[0-9](\.[0-9])?$' | sort | tail -1
+    register: python_path
+  - name: Check python version
+    shell: "{{ python_path.stdout }} -V"
+    register: python_ver
+
+### Upload scan file and uncompress
+  - name: mkdir
+    file:
+      path: "{{ scan_path }}"
+      state: directory
+  - name: scp
+    copy:
+      src: "/data/temp/ashurei/keyword/keyword_scan_only_v11.zip"
+      dest: "{{ scan_path }}/keyword_scan_only_v11.zip"
+  - name: Uncompress
+    unarchive:
+      src: "{{ scan_path }}/keyword_scan_only_v11.zip"
+      dest: "{{ scan_path }}"
+      remote_src: True
+
+### Execute
+  - name: execute with python 2
+    become: yes
+    shell:
+      cmd: python2 {{ scan_path }}/keyword_scan_only_python2_v11.py / --del-keyword 'lsm,cms,atom,growin,Ericsson,speed,SFSS,_2012,a12345,admin123,root123,3pardata' --exclude-dir /var/lib/docker/overlay2,/var/lib/containers/storage/overlay
+      chdir: "{{ scan_path }}"
+    when: python_ver.stdout is regex("^Python 2")
+  - name: execute with python 3
+    shell:
+      cmd: python3 {{ scan_path }}/keyword_scan_only_python3_v11.py / --del-keyword 'lsm,cms,atom,growin,Ericsson,speed,SFSS,_2012,a12345,admin123,root123,3pardata' --exclude-dir /var/lib/docker/overlay2,/var/lib/containers/storage/overlay
+      chdir: "{{ scan_path }}"
+    when: python_ver.stdout is regex("^Python 3")
+
+### Download output file
+  - name: find
+    find:
+      paths: "{{ scan_path }}"
+      patterns: "add_keyword_scan_output_*.txt"
+    register: found_files
+  - name: sort
+    set_fact:
+      latest_file: >-
+        {{
+          (found_files.files | sort(attribute='mtime', reverse=True) | first).path
+          if found_files.matched > 0
+          else ''
+        }}
+  - name: Fetch latest file
+    fetch:
+      src: "{{ latest_file }}"
+      dest: /data/temp/ashurei/keyword/20250917/   # 디렉토리라면 마지막 '/' 표기.
+      flat: yes
+    when: latest_file != ''            # lastest_file 이 존재하면 loop
+
+### Remove files
+  - name: Remove directory
+    file:
+      path: "{{ scan_path }}"
+      state: absent
