@@ -25,7 +25,7 @@ menuentry 'Install Rocky Linux 8.8' --class fedora --class gnu-linux --class gnu
 	initrdefi /images/pxeboot/initrd.img
 }
 menuentry 'Install Rocky Linux 8.8 custom with USB' --class fedora --class gnu-linux --class gnu --class os {
-	linuxefi /images/pxeboot/vmlinuz inst.ks=hd:LABEL=ROCKY88:/custom/rocky8_usb.ks inst.stage2=hd:LABEL=ROCKY88 quiet
+    linuxefi /images/pxeboot/vmlinuz inst.ks=hd:LABEL=ROCKY810:/custom/rocky810_usb.ks inst.stage2=hd:LABEL=ROCKY810 quiet
 	initrdefi /images/pxeboot/initrd.img
 }
 menuentry 'Test this media & install Rocky Linux 8.8' --class fedora --class gnu-linux --class gnu --class os {
