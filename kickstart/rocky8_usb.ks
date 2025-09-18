@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Redhat Linux 8.10
 # Create DATE : 2022.03.11
-# Last Update DATE : 2025.08.17 by ashurei
+# Last Update DATE : 2025.09.19 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2022
 ########################################################
 
@@ -150,10 +150,10 @@ EOF
 
 ##### Kernel patch #####
 RPMDIR="/root/rpm"
-rpm -ivh ${RPMDIR}/kernel-core-4.18.0-553.64.1.el8_10.x86_64.rpm ${RPMDIR}/kernel-modules-4.18.0-553.64.1.el8_10.x86_64.rpm ${RPMDIR}/kernel-4.18.0-553.64.1.el8_10.x86_64.rpm
-rpm -Uvh ${RPMDIR}/kernel-devel-4.18.0-553.64.1.el8_10.x86_64.rpm
-rpm -Uvh ${RPMDIR}/kernel-headers-4.18.0-553.64.1.el8_10.x86_64.rpm
-rpm -Uvh ${RPMDIR}/kernel-tools-4.18.0-553.64.1.el8_10.x86_64.rpm ${RPMDIR}/kernel-tools-libs-4.18.0-553.64.1.el8_10.x86_64.rpm
+rpm -ivh ${RPMDIR}/kernel-core-4.18.0-553.74.1.el8_10.x86_64.rpm ${RPMDIR}/kernel-modules-4.18.0-553.74.1.el8_10.x86_64.rpm ${RPMDIR}/kernel-4.18.0-553.74.1.el8_10.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-devel-4.18.0-553.74.1.el8_10.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-headers-4.18.0-553.74.1.el8_10.x86_64.rpm
+rpm -Uvh ${RPMDIR}/kernel-tools-4.18.0-553.74.1.el8_10.x86_64.rpm ${RPMDIR}/kernel-tools-libs-4.18.0-553.74.1.el8_10.x86_64.rpm
 
 
 # Security #
