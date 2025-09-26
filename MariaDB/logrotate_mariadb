@@ -1,0 +1,36 @@
+# Error log
+/MARIA/LOG/error/mariadb-error.log {
+    notifempty
+    daily
+    rotate 14
+    missingok
+    dateext
+    compress
+    postrotate
+    # just if mariadbd is really running
+    if test -x "/MARIA/mariadb/bin/mariadb-admin" &&
+       /MARIA/mariadb/bin/mariadb-admin -S /MARIA/TMP/mariadb.sock ping &>/dev/null
+    then
+       /MARIA/mariadb/bin/mariadb-admin -S /MARIA/TMP/mariadb.sock \
+         --local flush-error-log flush-engine-log flush-general-log flush-slow-log
+    fi
+    endscript
+}
+
+# Slow log
+/MARIA/LOG/slow/mariadb-slow-query.log {
+    notifempty
+    daily
+    rotate 14
+    missingok
+    dateext
+    compress
+    postrotate
+    # just if mariadbd is really running
+    if test -x "/MARIA/mariadb/bin/mariadb-admin" &&
+       /MARIA/mariadb/bin/mariadb-admin -S /MARIA/TMP/mariadb.sock ping &>/dev/null
+    then
+       /MARIA/mariadb/bin/mariadb-admin -S /MARIA/TMP/mariadb.sock \
+         --local flush-error-log flush-engine-log flush-general-log flush-slow-log
+    fi
+    endscript
