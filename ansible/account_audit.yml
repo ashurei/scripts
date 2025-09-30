@@ -1,0 +1,49 @@
+### 2025.09.29 Created by ashurei@sk.com v1
+---
+- name: account audit
+  hosts: all
+  gather_facts: false
+  vars:
+    scan_path: /tmp/account_audit
+  tasks:
+
+### Upload scan file and uncompress
+  - name: mkdir
+    file:
+      path: "{{ scan_path }}"
+      state: directory
+  - name: scp
+    copy:
+      src: "{{ item }}"
+      dest: "{{ scan_path }}/"
+    loop:
+      - account_audit_v1.0.2.sh
+
+### Execute
+  - name: execute
+    become: yes
+    shell:
+      cmd: sh account_audit_v1.0.2.sh
+      chdir: "{{ scan_path }}"
+    failed_when: false
+#    async: 36000
+#    poll: 30
+
+### Download output file
+  - name: find
+    find:
+      paths: "{{ scan_path }}"
+      patterns: "*_account_audit*"
+    register: found_files
+  - name: Fetch files
+    fetch:
+      src: "{{ item.path }}"
+      dest: /data/temp/ashurei/account_audit/20250929/   # 디렉토리라면 마지막 '/' 표기.
+      flat: yes
+    loop: "{{ found_files.files }}"
+
+### Remove files
+  - name: Remove directory
+    file:
+      path: "{{ scan_path }}"
+      state: absent
