@@ -45,14 +45,14 @@
     pstmt.setInt(1,id);
     rs = pstmt.executeQuery();
 
+    /*
     String c = null;
-
     while (rs.next()) {
       c = rs.getString(1);
-    }
+      if(log == true) System.out.println("c = " + c);
+    }*/
     rs.close();
     pstmt.close();
-    if(log == true) System.out.println("c = " + c);
 
     result = "success";
   }
