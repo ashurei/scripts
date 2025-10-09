@@ -1,0 +1,4 @@
+<Context>
+  <ResourceLink global="jdbc/mariadb" name="jdbc/mariadb" type="javax.sql.DataSource" />
+  <Resources allowLinking="true" />
+</Context>
