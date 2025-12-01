@@ -94,6 +94,6 @@ fi
 ### Compress
 echo "+ chown Backup directory"
 sudo chown -R tcore:tcore "$BACKDIR"
-tar cfz "${BASEDIR}/TDIM_${TODAY}.tgz" "$BACKDIR"
+tar cfz "${BASEDIR}/TDIM_${TODAY}.tgz" -C "$BASEDIR" "$TODAY"
 
 } >> "$LOGFILE" 2>&1
