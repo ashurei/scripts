@@ -38,7 +38,6 @@ then
   cp -pr --parents /home/tcore/sw/redis/data/7002/redis-7002.conf "$BACKDIR"/
 fi
 
-cp -pr --parents /home/tcore/sw/kibana/config "$BACKDIR"/
 cp -pr --parents /home/tcore/sw/spark/conf "$BACKDIR"/
 cp -pr --parents /home/tcore/sw/spark/sbin "$BACKDIR"/
 
@@ -55,6 +54,7 @@ cp -p --parents /data/tcore-apps/bin/kafka-ui/docker-compose.yml "$BACKDIR"/
 if [[ $(hostname) =~ -master(01|02)$ ]]
 then
   echo "+ Backup master config of other user..."
+  cp -pr --parents /home/tcore/sw/kibana/config "$BACKDIR"/
   sudo cp -p --parents /etc/keepalived/keepalived.conf "$BACKDIR"/  # root:root
   sudo cp -p --parents /etc/haproxy/haproxy.cfg "$BACKDIR"/         # root:root
   sudo cp -p --parents /etc/nginx/conf.d/repo.conf "$BACKDIR"/      # root:root
