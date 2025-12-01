@@ -15,8 +15,11 @@ BACKDIR="${BASEDIR}/${TODAY}"
 LOGFILE="${BASEDIR}/backup_${TODAY}.log"
 
 {
-if [ ! -d "$BACKDIR" ]
+if [ -d "$BACKDIR" ]
 then
+  echo "[ERROR] Backup directory is exists."
+  exit 1
+else
   mkdir -p "$BACKDIR"
 fi
 
