@@ -43,6 +43,7 @@ cp -pr --parents /home/tcore/sw/spark/conf "$BACKDIR"/
 cp -pr --parents /home/tcore/sw/spark/sbin "$BACKDIR"/
 
 if [ -d "/home/tcore/sw/zookeeper" ]
+then
   cp -pr --parents /home/tcore/sw/zookeeper/conf "$BACKDIR"/
 fi
 
