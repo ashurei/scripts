@@ -2,7 +2,7 @@
 ########################################################
 # Description : TDIM backup script
 # Create DATE : 2025.12.01
-# Last Update DATE : 2025.12.01 by ashurei
+# Last Update DATE : 2025.12.02 by ashurei
 # Copyright (c) Technical Solution, 2025
 ########################################################
 
@@ -77,16 +77,17 @@ fi
 if [ -x "/MARIA/mariadb/bin/mariadb" ]
 then
   DBDIR="${BACKDIR}/MariaDB"
+  MARIADB_DUMP="/MARIA/mariadb/bin/mariadb-dump -S /MARIA/TMP/mariadb.sock"
   mkdir -p "$DBDIR"
   echo "+ Backup MariaDB..."
-  mariadb-dump --single-transaction \
+  $MARIADB_DUMP --single-transaction \
     --ignore-table=tcore_alarm.vw_alarm_exception_bas tcore_alarm > "$DBDIR"/tcore_alarm.sql
-  mariadb-dump --single-transaction tcore_collector > "$DBDIR"/tcore_collector.sql
-  mariadb-dump --single-transaction \
+  $MARIADB_DUMP --single-transaction tcore_collector > "$DBDIR"/tcore_collector.sql
+  $MARIADB_DUMP --single-transaction \
     --ignore-table=tcore_common.vw_com_user_bas tcore_common > "$DBDIR"/tcore_common.sql
-  mariadb-dump --single-transaction tcore_data > "$DBDIR"/tcore_data.sql
-  mariadb-dump --single-transaction tcore_iautomation> "$DBDIR"/tcore_iautomation.sql
-  mariadb-dump --single-transaction \
+  $MARIADB_DUMP --single-transaction tcore_data > "$DBDIR"/tcore_data.sql
+  $MARIADB_DUMP --single-transaction tcore_iautomation> "$DBDIR"/tcore_iautomation.sql
+  $MARIADB_DUMP --single-transaction \
     --ignore-table=tcore_resource.vw_rep_resource_spec_tune \
     --ignore-table=tcore_resource.vw_rep_resource_asset \
     --ignore-table=tcore_resource.vw_rep_resource_bas \
@@ -95,7 +96,7 @@ then
     --ignore-table=tcore_resource.vw_rep_resource_spec \
     --ignore-table=tcore_resource.vw_rep_resource_staff \
     tcore_resource > "$DBDIR"/tcore_resource.sql
-  mariadb-dump --single-transaction tcore_ui > "$DBDIR"/tcore_ui.sql
+  $MARIADB_DUMP --single-transaction tcore_ui > "$DBDIR"/tcore_ui.sql
 fi
 
 ### Compress
