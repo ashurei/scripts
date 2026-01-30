@@ -627,7 +627,7 @@ col state for a20
 select owner_name, job_name, state from dba_datapump_jobs;
 
 # Datapump JOB 삭제
-select 'drop table system.'||job_name|| ';' from dba_datapump_jobs;
+select 'drop table '||owner_name||'.'||job_name|| ';' from dba_datapump_jobs;
 
 drop table <OWNER_NAME>.<JOB_NAME>;
 drop table SYSTEM.IMPDP_SSADBC;
