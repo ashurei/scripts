@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Redhat Linux 7.9
 # Create DATE : 2022.09.15
-# Last Update DATE : 2026.02.006 by ashurei
+# Last Update DATE : 2026.02.06 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2024
 ########################################################
 
