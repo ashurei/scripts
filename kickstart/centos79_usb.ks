@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Redhat Linux 7.9
 # Create DATE : 2022.09.15
-# Last Update DATE : 2025.06.25 by ashurei
+# Last Update DATE : 2026.02.006 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2024
 ########################################################
 
@@ -121,15 +121,9 @@ sed -i 's/\*\/10/\*\/1/' /etc/cron.d/sysstat
 mkdir -p /etc/yum.repos.d/org
 mv /etc/yum.repos.d/CentOS-* /etc/yum.repos.d/org/
 cat << EOF > /etc/yum.repos.d/local.repo
-[base-tb-ossrepo]
-name=CentOS-$releasever - Base
-baseurl=http://60.30.131.100/repos/centos/7/os/x86_64
-enabled=1
-gpgcheck=0
-
-[updates-tb-ossrepo]
+[local]
 name=CentOS-$releasever - Updates
-baseurl=http://60.30.131.100/repos/centos/7/updates/x86_64
+baseurl=file:///mnt/repo
 enabled=1
 gpgcheck=0
 EOF
@@ -159,7 +153,7 @@ rpm -Uvh ${RPMDIR}/kernel-tools-libs-devel-3.10.0-1160.108.1.el7.x86_64.rpm
 
 # [ Security ]
 ##### Set Banner File #####
-cat << EOF > /etc/issue
+cat << EOF > /etc/motd
  #####################################################################
  #  This system is for the use of authorized users only.             #
  #  Individuals using this computer system without authority, or in  #
@@ -177,7 +171,7 @@ cat << EOF > /etc/issue
  #  evidence of such monitoring to law enforcement officials.        #
  #####################################################################
 EOF
-cat /etc/issue > /etc/issue.net
+#cat /etc/issue > /etc/issue.net
 
 sed -i '/^#smtpd_banner/s/^#//g' /etc/postfix/main.cf
 
@@ -185,13 +179,15 @@ sed -i '/^#smtpd_banner/s/^#//g' /etc/postfix/main.cf
 ##### Delete not using user #####
 mkdir /root/backup
 cp /etc/passwd /root/backup/passwd.org
-sed -i 's/lp/#lp/'             /etc/passwd
-sed -i 's/shutdown/#shutdown/' /etc/passwd
-sed -i 's/operator/#operator/' /etc/passwd
-sed -i 's/sync/#sync/'         /etc/passwd
-sed -i 's/halt/#halt/'         /etc/passwd
-sed -i 's/ftp/#ftp/'           /etc/passwd
-
+userdel lp
+userdel shutdown
+userdel operator
+userdel sync
+userdel halt
+userdel ftp
+groupdel input
+echo >> /etc/csh.login
+echo 'set autologout=10' >> /etc/csh.login
 
 ##### Add "suser" #####
 useradd -u 1000 suser
@@ -227,8 +223,8 @@ chmod 640 /etc/rsyslog.conf
 #chown -R root. /var/log/cups
 chown root.wheel /bin/su
 chmod 4750 /bin/su
-chmod -s /usr/bin/newgrp
-chmod -s /sbin/unix_chkpwd
+chmod 755 /usr/bin/newgrp
+chmod 755 /sbin/unix_chkpwd
 
 
 ##### SSH root access configuration #####
@@ -243,12 +239,14 @@ SYTEM_AUTH="/etc/pam.d/system-auth-ac"
 sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_time=3600 magic_root' ${SYTEM_AUTH}
 sed -i '10 a\account     required      pam_tally2.so magic_root' ${SYTEM_AUTH}
 sed -i '/pam_faildelay/ {s/^/#/}' ${SYTEM_AUTH}
+sed -i -r '/pam_tally2.so/s/deny=[0-9]+/deny=5/' ${SYTEM_AUTH}
 
 # password-auth-ac
 PASSWD_AUTH="/etc/pam.d/password-auth-ac"
 sed -i '4 a\auth        required      pam_tally2.so onerr=fail deny=10 unlock_time=3600 magic_root' ${PASSWD_AUTH}
 sed -i '10 a\account     required      pam_tally2.so magic_root' ${PASSWD_AUTH}
 sed -i '/pam_faildelay/ {s/^/#/}' ${PASSWD_AUTH}
+sed -i -r '/pam_tally2.so/s/deny=[0-9]+/deny=5/' ${PASSWD_AUTH}
 
 # su
 sed -i '/pam_wheel.so use_uid/s/^#//' /etc/pam.d/su
@@ -256,6 +254,14 @@ sed -i '/pam_wheel.so use_uid/s/^#//' /etc/pam.d/su
 
 ##### kdump settings #####
 sed -i '/^core_collector/ {s/-l/-c/}' /etc/kdump.conf
+
+
+##### Added 2026.02.06 for SmartGuard
+sed -i '/minlen/s/^# //' /etc/security/pwquality.conf
+sed -i '/dcredit/s/# dcredit = [0-9]/dcredit = -1/' /etc/security/pwquality.conf
+sed -i '/ucredit/s/# ucredit = [0-9]/ucredit = -1/' /etc/security/pwquality.conf
+sed -i '/lcredit/s/# lcredit = [0-9]/lcredit = -1/' /etc/security/pwquality.conf
+sed -i '/ocredit/s/# ocredit = [0-9]/ocredit = -1/' /etc/security/pwquality.conf
 
 
 ##### /etc/profile #####
