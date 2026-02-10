@@ -1,7 +1,7 @@
 ########################################################
 # Description : Kickstart for Redhat Linux 7.9
 # Create DATE : 2022.09.15
-# Last Update DATE : 2026.02.06 by ashurei
+# Last Update DATE : 2026.02.10 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2024
 ########################################################
 
@@ -256,13 +256,16 @@ sed -i '/pam_wheel.so use_uid/s/^#//' /etc/pam.d/su
 sed -i '/^core_collector/ {s/-l/-c/}' /etc/kdump.conf
 
 
-##### Added 2026.02.06 for SmartGuard
+##### Added 2026.02.06
 sed -i '/minlen/s/^# //' /etc/security/pwquality.conf
 sed -i '/dcredit/s/# dcredit = [0-9]/dcredit = -1/' /etc/security/pwquality.conf
 sed -i '/ucredit/s/# ucredit = [0-9]/ucredit = -1/' /etc/security/pwquality.conf
 sed -i '/lcredit/s/# lcredit = [0-9]/lcredit = -1/' /etc/security/pwquality.conf
 sed -i '/ocredit/s/# ocredit = [0-9]/ocredit = -1/' /etc/security/pwquality.conf
 
+##### Added 2026.02.10
+sed -i '/^\$umask/s/^/#/' /etc/rsyslog.conf
+sed -i '/^\$FileCreateMode/s/^/#/' /etc/rsyslog.conf
 
 ##### /etc/profile #####
 sed -i '/umask/s/002/022/g' /etc/profile
