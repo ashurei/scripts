@@ -2,7 +2,7 @@
 ########################################################
 # Description : TDIM backup script
 # Create DATE : 2025.12.01
-# Last Update DATE : 2025.12.02 by ashurei
+# Last Update DATE : 2026.02.11 by ashurei
 # Copyright (c) Technical Solution, 2025
 ########################################################
 
@@ -27,8 +27,10 @@ fi
 echo "Delete backup files"
 # Delete backup file 1 days+ ago
 find ${BASEDIR:?} -mtime +2 -type d -regextype posix-extended -regex "${BASEDIR:?}/[0-9]{8}" -print0 | xargs -0 rm -r
+# Delete tar file 7 days+ ago
+find ${BASEDIR:?} -mtime +6 -type f -regextype posix-extended -regex "${BASEDIR:?}/TDIM_[0-9]{8}.tgz" -type f -delete
 # Delete log file 7 day+ ago
-find ${BASEDIR:?}/backup_*.log -mtime +6 -type f -delete
+find ${BASEDIR:?} -mtime +6 -type f -regextype posix-extended -regex "${BASEDIR:?}/backup_[0-9]{8}.tgz" -type f -delete
 
 ### Backup target directory
 echo "+ Backup S/W files..."
