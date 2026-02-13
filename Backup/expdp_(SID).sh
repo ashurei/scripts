@@ -2,7 +2,7 @@
 #################################################
 # Description : Oracle expdp
 # Create DATE : 2019.12.11
-# Last Update DATE : 2021.11.12 by ashurei
+# Last Update DATE : 2026.02.13 by ashurei
 # Copyright (c) ashurei@sk.com, 2021
 #################################################
 
@@ -12,8 +12,6 @@
 export ORACLE_SID="UAPDB1"
 export ORACLE_HOME="/oracle/database/product/19"
 BACKDIR="/oracle/backup/expdp"
-USER="system"
-PASSWD="SKTelecom!2#4"
 ################################
 DATE=$(date '+%Y%m%d')
 BACKLOG=${BACKDIR}/oracle_expdp_${DATE}.log
@@ -66,5 +64,5 @@ fi
 #==============================================================================================================#
 ### Execute expdp
 echo "[${DATE} $(date '+%H:%M:%S')] Backup start." >> "${BACKLOG}"
-$ORACLE_HOME/bin/expdp ${USER}/${PASSWD} dumpfile=${DIR_DUMP}:"${OUTPUT}".dmp logfile=${DIR_LOG}:"${OUTPUT}".log job_name="${OUTPUT}" full=y
+$ORACLE_HOME/bin/expdp "'/as sysdba'" dumpfile=${DIR_DUMP}:"${OUTPUT}".dmp logfile=${DIR_LOG}:"${OUTPUT}".log job_name="${OUTPUT}" full=y
 echo "[${DATE} $(date '+%H:%M:%S')] Backup end." >> "${BACKLOG}"
