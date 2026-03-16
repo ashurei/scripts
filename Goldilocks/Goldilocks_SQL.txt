@@ -17,6 +17,18 @@ gsql sys gliese --as sysdba
 \connect sys gliese as sysdba
 
 
+-- DB start
+-- 각 node 수행
+gSQL> startup
+-- node#1
+gSQL> alter system open global database;
+-- node#2
+gSQL> alter database join database;
+
+-- Listener start
+glsnr --start
+
+
 -- Dictionary 조회
 select table_name from dict;
 select table_name from dictionary;
@@ -133,23 +145,15 @@ select name, description from v$wait_event_name;
 select * from v$transaction;
 
 
-
-
 -- DDL 구문 추출 (매뉴얼 p.3201)
 \ddl_tablespace [tablespace명] 			: tablespace 관련 구문 전부 표시
 \ddl_tablespace [tablespace명] create	: tablespace 생성 구문 표시
 \ddl_table [table명] create				: table 생성 구문 표시
 
 
-
-
 -- 실행 플랜 조회
 \explain plan		: 1회성
 \set autotrace on	: 세션 종료까지 유지
-
-
-
-
 
 
 ### gloader
