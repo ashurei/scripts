@@ -2,11 +2,11 @@
 ########################################################
 # Description : Setup convergence security
 # Create DATE : 2026.09.07
-# Last Update DATE : 2026.09.07 by ashurei
+# Last Update DATE : 2026.09.08 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.09.07.r01"
+SCRIPT_VER="2026.09.08.r04"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -17,16 +17,16 @@ set -euo pipefail
 VIRT_TYPE=$(systemd-detect-virt 2>/dev/null || true)
 if [ "$VIRT_TYPE" != "none" ] && [ -n "$VIRT_TYPE" ]
 then
-    echo "[ERROR] This machine is Virtual Server."
-    echo "[ERROR] Virtualization: $VIRT_TYPE"
-	exit 1
+        echo "[ERROR] This machine is Virtual Server."
+        echo "[ERROR] Virtualization: $VIRT_TYPE"
+        exit 1
 fi
 
 ### Check root permission
 if [ "$(id -u)" -ne 0 ]
 then
-	echo "[ERROR] You have to execute this script with 'sudo' or 'root'."
-	exit 1
+        echo "[ERROR] You have to execute this script with 'sudo' or 'root'."
+        exit 1
 fi
 
 ### Check manufacturer
@@ -36,16 +36,16 @@ echo "Manufacturer: $MANUFACTURER"
 echo "Product     : $PRODUCT"
 
 case "$MANUFACTURER" in
-	*HPE*|*HP*|*Hewlett-Packard*)
-		VENDOR="HP"
-		;;
-	*Dell*)
-		VENDOR="DELL"
-		;;
-	*)
-		echo "[ERROR] This script supports only HP and DELL server"
-		exit 1
-		;;
+        *HPE*|*HP*|*Hewlett-Packard*)
+                VENDOR="HP"
+                ;;
+        *Dell*)
+                VENDOR="DELL"
+                ;;
+        *)
+                echo "[ERROR] This script supports only HP and DELL server"
+                exit 1
+                ;;
 esac
 
 
@@ -108,27 +108,42 @@ function mark_skipped() {
 
 function run_cmd() {
     local rc
-	if "$@"; then
-		return 0
-	else
+        if "$@"; then
+                return 0
+        else
         rc=$?
-	    exit_with_error "$rc" "Execution failed: $*"
+            exit_with_error "$rc" "Execution failed: $*"
     fi
 }
 
 function detect_rhel_major() {
-	local os_major=""
-	[ -r /etc/os-release ] || return 1
-	source /etc/os-release
-	os_major="${VERSION_ID:-}"
-	[ -n "$os_major" ] || return 1
-	printf '%s\n' "${os_major%%.*}"
+        local os_major=""
+        [ -r /etc/os-release ] || return 1
+        source /etc/os-release
+        os_major="${VERSION_ID:-}"
+        [ -n "$os_major" ] || return 1
+        printf '%s\n' "${os_major%%.*}"
 }
 
 # ========================================================================================== #
 ### Configure common variable
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
-CRON_SCRIPT="bmc_monitor.sh"
+
+### Set to install rpm name with vendor
+OS_MAJOR=$(detect_rhel_major) || exit_with_error 1 "Unable to detect OS major version."
+case "$VENDOR" in
+        HP)
+                BMC_PACKAGE="ilorest"
+                RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/hp"
+                CRON_SCRIPT="ilo_monitor.sh"
+                ;;
+        DELL)
+                BMC_PACKAGE="idrac-link-monitor"
+                RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/dell"
+                CRON_SCRIPT="idrac_monitor.sh"
+                ;;
+esac
+
 RUN_SCRIPT="find_idle_ports.sh"
 ILO_DIR="/root/ilo_monitor"
 
@@ -142,10 +157,10 @@ CRON_COMMENT="### Convergence Security"
 
 STEP_NAMES=(
     ""
-	"[STEP 1] Install RPMS (ilorest, ipmitool)"
+    "[STEP 1] Install RPMS (ilorest, ipmitool)"
     "[STEP 2] ilo_monitor - Create directory and move script files"
     "[STEP 3] Execute script now"
-    "[STEP 4] Check log file"    
+    "[STEP 4] Check log file"
     "[STEP 5] Register crontab"
 )
 STEP_STATUS=("" "PENDING" "PENDING" "PENDING" "PENDING" "PENDING")
@@ -162,26 +177,13 @@ echo "[STEP 1] Install RPMS (ilorest, ipmitool)"
 echo "==============================================================="
 CURRENT_STEP=1
 
-### Set to install rpm name with vendor
-OS_MAJOR=$(detect_rhel_major) || exit_with_error 1 "Unable to detect OS major version."
-case "$VENDOR" in
-	HP)
-		BMC_PACKAGE="ilorest"
-		RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/hp"
-		;;
-	DELL)
-		BMC_PACKAGE="idrac-link-monitor"
-		RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/dell"
-		;;
-esac
-
 ### Check rpm files and install
 RPM_FILES=("$RPM_DIR"/*.rpm)
 if [ ! -e "${RPM_FILES[0]}" ]
 then
-	exit_with_error 1 "No BMC RPM files: $RPM_DIR"
+        exit_with_error 1 "No BMC RPM files: $RPM_DIR"
 fi
-run_cmd yum install -y --disablerepo='*' "${RPM_FILES[@]}"
+yum install -y --disablerepo='*' "${RPM_FILES[@]}" || true
 
 IPMITOOL_BIN=$(command -v ipmitool || true)
 [ -n "$IPMITOOL_BIN" ] || exit_with_error 1 "ipmitool command not found after installation."
@@ -267,8 +269,8 @@ echo "[STEP 5] Register crontab"
 echo "=================================================="
 CURRENT_STEP=5
 
-FLOCK_BIN=$(command -v flock || true
-[ -n "$FLOCK_BIN" ] || 	exit_with_error 1 "flock command is not found."
+FLOCK_BIN=$(command -v flock || true)
+[ -n "$FLOCK_BIN" ] ||  exit_with_error 1 "flock command is not found."
 
 CRON_USER="root"
 CRON_JOB1="* * * * * ${FLOCK_BIN} -n /var/run/bmc_monitor.lock ${DST_CRON_SCRIPT} >/dev/null 2>&1"
@@ -283,16 +285,18 @@ elif (
         echo "$CURRENT_CRON"
         echo "$CRON_COMMENT"
         echo "$CRON_JOB1"
-		echo "$CRON_JOB2"
-	) | crontab -u "$CRON_USER" -
+        echo "$CRON_JOB2"
+        ) | crontab -u "$CRON_USER" -
 then
-    echo "[OK] Register crontab is succeeded."
-    echo "      ${CRON_JOB1}"
-	echo "      ${CRON_JOB2}"
-    mark_ok 5 "Register crontab is succeeded."
+        echo "[OK] Register crontab is succeeded."
+        echo "[CRONTAB]"
+        echo "$CRON_COMMENT"
+        echo "${CRON_JOB1}"
+        echo "${CRON_JOB2}"
+        mark_ok 5 "Register crontab is succeeded."
 else
-	rc=$?
-	exit_with_error "$rc" "Register crontab is failed."
+        rc=$?
+        exit_with_error "$rc" "Register crontab is failed."
 fi
 
 FAILED_RC=0
