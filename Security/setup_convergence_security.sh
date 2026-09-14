@@ -2,11 +2,11 @@
 ########################################################
 # Description : Setup convergence security
 # Create DATE : 2026.09.07
-# Last Update DATE : 2026.09.08 by ashurei
+# Last Update DATE : 2026.09.14 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.09.08.r04"
+SCRIPT_VER="2026.09.14.r04"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -136,6 +136,7 @@ case "$VENDOR" in
                 BMC_PACKAGE="ilorest"
                 RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/hp"
                 CRON_SCRIPT="ilo_monitor.sh"
+                BMC_DIR="/root/ilo_monitor"
                 ;;
         DELL)
                 BMC_PACKAGE="idrac-link-monitor"
@@ -144,18 +145,12 @@ case "$VENDOR" in
                 RACADM_TAR_FILE="Dell-iDRACTools-Web-LX-11.3.0.0-795_A00.tar.gz"
                 RACADM_PACKAGE="srvadmin-idracadm7"
                 RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
-                IDRAC_MONITOR_LOG_FILE="/var/log/idrac_link_monitor.log"
+                #IDRAC_MONITOR_LOG_FILE="/var/log/idrac_link_monitor.log"
+                BMC_DIR="/root/idrac_monitor"
                 ;;
 esac
 
 RUN_SCRIPT="find_idle_ports.sh"
-ILO_DIR="/root/ilo_monitor"
-
-SRC_CRON_SCRIPT="${BASE_DIR}/${CRON_SCRIPT}"
-SRC_RUN_SCRIPT="${BASE_DIR}/${RUN_SCRIPT}"
-
-DST_CRON_SCRIPT="${ILO_DIR}/${CRON_SCRIPT}"
-DST_RUN_SCRIPT="${ILO_DIR}/${RUN_SCRIPT}"
 
 CRON_COMMENT="### Convergence Security"
 
@@ -176,9 +171,9 @@ SUMMARY_PRINTED=0
 
 trap 'rc=$?; if [ "$rc" -ne 0 ]; then FAILED_RC="$rc"; FAILED_STEP="$CURRENT_STEP"; STEP_STATUS[$CURRENT_STEP]="FAILED"; STEP_MESSAGE[$CURRENT_STEP]="ERROR"; print_summary; fi' EXIT
 
-echo "==============================================================="
-echo "[STEP 1] Install RPMS (ilorest, ipmitool)"
-echo "==============================================================="
+echo "======================================================================="
+echo "[STEP 1] Install RPMS (ilorest(HP), idrac-link-monitor(DELL), ipmitool)"
+echo "======================================================================="
 CURRENT_STEP=1
 
 ### Check rpm files and install
@@ -194,20 +189,34 @@ IPMITOOL_BIN=$(command -v ipmitool || true)
 
 # ===================================== #
 ### Dell
-if [ "$VENDOR" == "Dell" ]; then
-        if rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
-                TMPDIR="${BASE_DIR}/temp"
-                mkdir -p "$TMPDIR"
-                tar xfz "${BASE_DIR}/${RACADM_TAR_FILE}" -C "$TMPDIR"
-                if [ ! -x "${TMPDIR}/iDRACTools/racadm/install_racadm.sh" ]; then
-                        run_cmd chmod +x "${TMPDIR}/iDRACTools/racadm/install_racadm.sh"
+if [ "$VENDOR" = "Dell" ]; then
+        if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
+                RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"                
+                RACADM_TMP_DIR="${BASE_DIR}/temp_racadm"
+                RACADM_INSTALL="${RACADM_TMP_DIR}/iDRACTools/racadm/install_racadm.sh"
+
+                [ -f "$RACADM_ARCHIVE" ] || exit_with_error 1 "racadm archive is not found: $RACADM_ARCHIVE"
+                
+                run_cmd rm -rf "$RACADM_TMP_DIR"
+                run_cmd mkdir -p "$RACADM_TMP_DIR"
+                run_cmd tar xfz "$RACADM_ARCHIVE" -C "$RACADM_TMP_DIR"
+
+                [ -f "$RACADM_INSTALL" ] || exit_with_error 1 "racadm installer is not found: $RACADM_INSTALL"
+
+                if [ ! -x "$RACADM_INSTALL"]; then
+                        run_cmd chmod +x "$RACADM_INSTALL"
                 fi
-                (cd "${TMP_RACADM_DIR}/iDRACTools/racadm" && ./install_racadm.sh)
-                RESULT=$?
-                if [ "$RESULT" -ne 0 ]; then
-                    exit_with_error "$RESULT" "racadm install script failed."
+                
+                if (cd "${RACADM_TMP_DIR}/iDRACTools/racadm" && ./install_racadm.sh); then
+                        echo "[OK] racadm installation completed."
+                else
+                        rc=$?
+                        exit_with_error "$rc" "racadm install script failed."
                 fi
         fi
+        # Post check
+        if ! rpm -q "RACADM_PACKAGE" >/dev/null 2>&1; then
+                exit_with_error 1 "RACADM_PACKAGE is not installed."
         if ! command -v racadm >/dev/null 2>&1 && [ ! -x "$RACADM_BIN" ]; then
                 exit_with_error 1 "racadm binary is not exists."
         fi
@@ -223,16 +232,22 @@ mark_ok 1 "${BMC_PACKAGE}, ipmitool install is completed"
 
 
 echo
-echo "==============================================================="
+echo "======================================================================="
 echo "[STEP 2] ilo_monitor - Create directory and move script files"
-echo "==============================================================="
+echo "======================================================================="
 CURRENT_STEP=2
 
-if [ ! -d "$ILO_DIR" ]; then
-    run_cmd mkdir -p "$ILO_DIR"
-    echo "[OK] Create directory completed. : ${ILO_DIR}"
+SRC_CRON_SCRIPT="${BASE_DIR}/${CRON_SCRIPT}"
+SRC_RUN_SCRIPT="${BASE_DIR}/${RUN_SCRIPT}"
+
+DST_CRON_SCRIPT="${BMC_DIR}/${CRON_SCRIPT}"
+DST_RUN_SCRIPT="${BMC_DIR}/${RUN_SCRIPT}"
+
+if [ ! -d "$BMC_DIR" ]; then
+    run_cmd mkdir -p "$BMC_DIR"
+    echo "[OK] Create directory completed. : ${BMC_DIR}"
 else
-    echo "[OK] Directory exists. : ${ILO_DIR}"
+    echo "[OK] Directory exists. : ${BMC_DIR}"
 fi
 
 if [ ! -f "$SRC_CRON_SCRIPT" ]; then
@@ -256,9 +271,9 @@ mark_ok 2 "Directory and script is deployed."
 
 
 echo
-echo "=================================================="
+echo "======================================================================="
 echo "[STEP 3] Execute script now"
-echo "=================================================="
+echo "======================================================================="
 CURRENT_STEP=3
 
 ### cron script
@@ -277,11 +292,10 @@ echo "[OK] Execute port_disable is succeeded."
 
 mark_ok 3 "Execute script is completed."
 
-
 echo
-echo "=================================================="
+echo "======================================================================="
 echo "[STEP 4] Check log file"
-echo "=================================================="
+echo "======================================================================="
 CURRENT_STEP=4
 
 LOG_FILE="/var/log/bmc_monitor.log"
@@ -294,9 +308,9 @@ else
 fi
 
 echo
-echo "=================================================="
+echo "======================================================================="
 echo "[STEP 5] Register crontab"
-echo "=================================================="
+echo "======================================================================="
 CURRENT_STEP=5
 
 FLOCK_BIN=$(command -v flock || true)
