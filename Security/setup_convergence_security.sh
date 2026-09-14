@@ -141,6 +141,10 @@ case "$VENDOR" in
                 BMC_PACKAGE="idrac-link-monitor"
                 RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/dell"
                 CRON_SCRIPT="idrac_monitor.sh"
+                RACADM_TAR_FILE="Dell-iDRACTools-Web-LX-11.3.0.0-795_A00.tar.gz"
+                RACADM_PACKAGE="srvadmin-idracadm7"
+                RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
+                IDRAC_MONITOR_LOG_FILE="/var/log/idrac_link_monitor.log"
                 ;;
 esac
 
@@ -187,6 +191,32 @@ yum install -y --disablerepo='*' "${RPM_FILES[@]}" || true
 
 IPMITOOL_BIN=$(command -v ipmitool || true)
 [ -n "$IPMITOOL_BIN" ] || exit_with_error 1 "ipmitool command not found after installation."
+
+# ===================================== #
+### Dell
+if [ "$VENDOR" == "Dell" ]; then
+        if rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
+                TMPDIR="${BASE_DIR}/temp"
+                mkdir -p "$TMPDIR"
+                tar xfz "${BASE_DIR}/${RACADM_TAR_FILE}" -C "$TMPDIR"
+                if [ ! -x "${TMPDIR}/iDRACTools/racadm/install_racadm.sh" ]; then
+                        run_cmd chmod +x "${TMPDIR}/iDRACTools/racadm/install_racadm.sh"
+                fi
+                (cd "${TMP_RACADM_DIR}/iDRACTools/racadm" && ./install_racadm.sh)
+                RESULT=$?
+                if [ "$RESULT" -ne 0 ]; then
+                    exit_with_error "$RESULT" "racadm install script failed."
+                fi
+        fi
+        if ! command -v racadm >/dev/null 2>&1 && [ ! -x "$RACADM_BIN" ]; then
+                exit_with_error 1 "racadm binary is not exists."
+        fi
+
+        ### idrac-link-monitor enable
+        run_cmd systemctl enable idrac-link-monitor
+        run_cmd systemctl start idrac-link-monitor
+fi
+# ===================================== #
 
 echo "[OK] ${BMC_PACKAGE}, ipmitool install is completed."
 mark_ok 1 "${BMC_PACKAGE}, ipmitool install is completed"
