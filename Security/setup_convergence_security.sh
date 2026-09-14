@@ -6,7 +6,7 @@
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.09.14.r04"
+SCRIPT_VER="2026.09.14.r05"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -130,7 +130,11 @@ function detect_rhel_major() {
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 ### Set to install rpm name with vendor
-OS_MAJOR=$(detect_rhel_major) || exit_with_error 1 "Unable to detect OS major version."
+OS_MAJOR=$(detect_rhel_major) || {
+        echo "[ERROR] Unable to detect OS major version."
+        exit 1
+}
+
 case "$VENDOR" in
         HP)
                 BMC_PACKAGE="ilorest"
@@ -176,20 +180,9 @@ echo "[STEP 1] Install RPMS (ilorest(HP), idrac-link-monitor(DELL), ipmitool)"
 echo "======================================================================="
 CURRENT_STEP=1
 
-### Check rpm files and install
-RPM_FILES=("$RPM_DIR"/*.rpm)
-if [ ! -e "${RPM_FILES[0]}" ]
-then
-        exit_with_error 1 "No BMC RPM files: $RPM_DIR"
-fi
-yum install -y --disablerepo='*' "${RPM_FILES[@]}" || true
-
-IPMITOOL_BIN=$(command -v ipmitool || true)
-[ -n "$IPMITOOL_BIN" ] || exit_with_error 1 "ipmitool command not found after installation."
-
 # ===================================== #
 ### Dell
-if [ "$VENDOR" = "Dell" ]; then
+if [ "$VENDOR" = "DELL" ]; then
         if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
                 RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"                
                 RACADM_TMP_DIR="${BASE_DIR}/temp_racadm"
@@ -203,7 +196,7 @@ if [ "$VENDOR" = "Dell" ]; then
 
                 [ -f "$RACADM_INSTALL" ] || exit_with_error 1 "racadm installer is not found: $RACADM_INSTALL"
 
-                if [ ! -x "$RACADM_INSTALL"]; then
+                if [ ! -x "$RACADM_INSTALL" ]; then
                         run_cmd chmod +x "$RACADM_INSTALL"
                 fi
                 
@@ -215,8 +208,9 @@ if [ "$VENDOR" = "Dell" ]; then
                 fi
         fi
         # Post check
-        if ! rpm -q "RACADM_PACKAGE" >/dev/null 2>&1; then
-                exit_with_error 1 "RACADM_PACKAGE is not installed."
+        if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
+                exit_with_error 1 "$RACADM_PACKAGE is not installed."
+        fi
         if ! command -v racadm >/dev/null 2>&1 && [ ! -x "$RACADM_BIN" ]; then
                 exit_with_error 1 "racadm binary is not exists."
         fi
@@ -226,6 +220,21 @@ if [ "$VENDOR" = "Dell" ]; then
         run_cmd systemctl start idrac-link-monitor
 fi
 # ===================================== #
+
+### Check rpm files and install
+RPM_FILES=("$RPM_DIR"/*.rpm)
+if [ ! -e "${RPM_FILES[0]}" ]
+then
+        exit_with_error 1 "No BMC RPM files: $RPM_DIR"
+fi
+yum install -y --disablerepo='*' "${RPM_FILES[@]}" || true
+
+if ! rpm -q "$BMC_PACKAGE" >/dev/null 2>&1; then
+        exit_with_error 1 "$BMC_PACKAGE is not installed."
+fi
+
+IPMITOOL_BIN=$(command -v ipmitool || true)
+[ -n "$IPMITOOL_BIN" ] || exit_with_error 1 "ipmitool command not found after installation."
 
 echo "[OK] ${BMC_PACKAGE}, ipmitool install is completed."
 mark_ok 1 "${BMC_PACKAGE}, ipmitool install is completed"
