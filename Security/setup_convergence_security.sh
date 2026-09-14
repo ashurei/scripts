@@ -6,7 +6,7 @@
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.09.14.r05"
+SCRIPT_VER="2026.09.14.r06"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -149,7 +149,7 @@ case "$VENDOR" in
                 RACADM_TAR_FILE="Dell-iDRACTools-Web-LX-11.3.0.0-795_A00.tar.gz"
                 RACADM_PACKAGE="srvadmin-idracadm7"
                 RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
-                #IDRAC_MONITOR_LOG_FILE="/var/log/idrac_link_monitor.log"
+                IDRAC_MONITOR_LOG_FILE="/var/log/idrac_link_monitor.log"
                 BMC_DIR="/root/idrac_monitor"
                 ;;
 esac
@@ -214,10 +214,6 @@ if [ "$VENDOR" = "DELL" ]; then
         if ! command -v racadm >/dev/null 2>&1 && [ ! -x "$RACADM_BIN" ]; then
                 exit_with_error 1 "racadm binary is not exists."
         fi
-
-        ### idrac-link-monitor enable
-        run_cmd systemctl enable idrac-link-monitor
-        run_cmd systemctl start idrac-link-monitor
 fi
 # ===================================== #
 
@@ -233,6 +229,18 @@ if ! rpm -q "$BMC_PACKAGE" >/dev/null 2>&1; then
         exit_with_error 1 "$BMC_PACKAGE is not installed."
 fi
 
+### Start & enable idrac-link-monitor
+if [ "$VENDOR" = "DELL" ]; then
+        ### idrac-link-monitor enable
+        run_cmd systemctl enable --now idrac-link-monitor
+        if [ -f "$IDRAC_MONITOR_LOG_FILE" ]; then
+                echo "[OK] Check idrac-link-monitor log file is completed."
+        else
+                exit_with_error 1 "There is no log file. : ${IDRAC_MONITOR_LOG_FILE}"
+        fi
+fi
+
+### Check ipmitool binary
 IPMITOOL_BIN=$(command -v ipmitool || true)
 [ -n "$IPMITOOL_BIN" ] || exit_with_error 1 "ipmitool command not found after installation."
 
