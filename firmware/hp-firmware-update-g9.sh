@@ -8,13 +8,14 @@
 
 set -euo pipefail
 
+### Check root permission
 if [ "$(id -u)" -ne 0 ]; then
     echo "[ERROR] You have to execute this script with root."
     exit 1
 fi
 
+### Check server model
 PRODUCT=$(cat /sys/class/dmi/id/product_name)
-
 case "$PRODUCT" in
     "ProLiant DL380 Gen9"|"ProLiant DL360 Gen9")
         ;;
