@@ -20,6 +20,7 @@ fi
 ### Variable
 GEN="10"
 
+### Check server model
 PRODUCT=$(cat /sys/class/dmi/id/product_name)
 case "$PRODUCT" in
         "ProLiant DL380 Gen10")
