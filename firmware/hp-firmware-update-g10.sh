@@ -61,11 +61,11 @@ echo "==========================================================================
 echo "[STEP 2] Download firmware files from tb-ossrepo"
 echo "======================================================================================"
 mkdir -p "$WORKDIR" && cd "$WORKDIR"
-curl -fL --retry 3 -O "http://60.30.131.100/repos/hp/gen${GEN}/${BIOS}"
-curl -fL --retry 3 -O "http://60.30.131.100/repos/hp/gen${GEN}/${INNOVATION}"
-curl -fL --retry 3 -O "http://60.30.131.100/repos/hp/gen${GEN}/${SPS}"
-curl -fL --retry 3 -O "http://60.30.131.100/repos/hp/gen${GEN}/${SMARTARRAY}"
-curl -fL --retry 3 -O "http://60.30.131.100/repos/hp/gen${GEN}/${ILO}"
+curl -fL --retry 3 -O "http://60.30.131.100/repos/firmware/hp/gen${GEN}/${BIOS}"
+curl -fL --retry 3 -O "http://60.30.131.100/repos/firmware/hp/gen${GEN}/${INNOVATION}"
+curl -fL --retry 3 -O "http://60.30.131.100/repos/firmware/hp/gen${GEN}/${SPS}"
+curl -fL --retry 3 -O "http://60.30.131.100/repos/firmware/hp/gen${GEN}/${SMARTARRAY}"
+curl -fL --retry 3 -O "http://60.30.131.100/repos/firmware/hp/gen${GEN}/${ILO}"
 
 ### Check before firmware version
 echo
