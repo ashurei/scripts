@@ -83,9 +83,9 @@ echo "==========================================================================
 echo "[STEP 2] Download firmware files from tb-ossrepo"
 echo "======================================================================================"
 mkdir -p "$WORKDIR" && cd "$WORKDIR"
-curl -fL --retry 3 -O "http://60.30.131.100/repos/hp/gen${GEN}/${BIOS}"
-curl -fL --retry 3 -O "http://60.30.131.100/repos/hp/gen${GEN}/${SMARTARRAY}"
-curl -fL --retry 3 -O "http://60.30.131.100/repos/hp/gen${GEN}/${ILO}"
+curl -fL --retry 3 -O "http://60.30.131.100/repos/firmware/hp/gen${GEN}/${BIOS}"
+curl -fL --retry 3 -O "http://60.30.131.100/repos/firmware/hp/gen${GEN}/${SMARTARRAY}"
+curl -fL --retry 3 -O "http://60.30.131.100/repos/firmware/hp/gen${GEN}/${ILO}"
 
 install_firmware "$BIOS" "System ROM P89"
 install_firmware "$SMARTARRAY" "Smart Array"
