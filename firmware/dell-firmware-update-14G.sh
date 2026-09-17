@@ -153,12 +153,10 @@ if check_firmware "$PERC_H740P" "PERC H740P"; then
     PERC="$PERC_H740P"
     PERC_NAME="PERC H740P"
     echo "[INFO] Detected compatible controller: $PERC_NAME"
-
 elif check_firmware "$PERC_H730P" "PERC H730/H730P"; then
     PERC="$PERC_H730P"
     PERC_NAME="PERC H730/H730P"
     echo "[INFO] Detected compatible controller: $PERC_NAME"
-
 else
     echo "[WARNING] Supported PERC controller was not detected."
     echo "[WARNING] PERC firmware update will be skipped."
