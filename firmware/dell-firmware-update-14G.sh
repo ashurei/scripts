@@ -15,9 +15,9 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 ### Check product model
-PRODUCT=$(< /sys/class/dmi/id/product_name)
+PRODUCT=$(cat /sys/class/dmi/id/product_name | cut -d',' -f1)
 case "$PRODUCT" in
-    "PowerEdge R640"|"PowerEdge R740")
+    "R640"|"R740")
         GEN="14"
         ;;
     *)
@@ -30,12 +30,12 @@ esac
 # ========================================================= #
 ### Variables
 BIOS="BIOS_188CW_LN64_2.28.1.BIN"
-IDRAC="iDRAC-with-Lifecycle-Controller_Firmware_CPCHX_LN64_7.30.30.51_A00.BIN"
+IDRAC="iDRAC-with-Lifecycle-Controller_Firmware_K7H6Y_LN64_7.00.00.185_A00.BIN"
 PERC_H740P="SAS-RAID_Firmware_F3J22_LN_51.16.0-4076_A16_01.BIN"
 PERC_H730P="SAS-RAID_Firmware_700GG_LN_25.5.9.0001_A17_01.BIN"
 
 WORKDIR="/tmp/dell-firmware-update"
-BASE_URL="http://60.30.131.100/repos/dell"
+BASE_URL="http://60.30.131.100/repos/firmware/dell"
 # ========================================================= #
 
 ### Function : Run Dell DUP compatibility check
@@ -126,8 +126,8 @@ echo "[STEP 1] Check Dell server information"
 echo "======================================================================================"
 echo "[INFO] Product    : $PRODUCT"
 echo "[INFO] Generation : ${GEN}G"
-echo "[INFO] BIOS       : $(< /sys/class/dmi/id/bios_version)"
-echo "[INFO] BIOS Date  : $(< /sys/class/dmi/id/bios_date)"
+echo "[INFO] BIOS       : $(cat /sys/class/dmi/id/bios_version)"
+echo "[INFO] BIOS Date  : $(cat /sys/class/dmi/id/bios_date)"
 
 
 ### STEP 2 : Download firmware
@@ -136,9 +136,7 @@ echo "==========================================================================
 echo "[STEP 2] Download Dell firmware files"
 echo "======================================================================================"
 
-mkdir -p "$WORKDIR"
-cd "$WORKDIR"
-
+mkdir -p "$WORKDIR" && cd "$WORKDIR"
 curl -fL --retry 3 -O "${BASE_URL}/${BIOS}"
 curl -fL --retry 3 -O "${BASE_URL}/${IDRAC}"
 curl -fL --retry 3 -O "${BASE_URL}/${PERC_H740P}"
