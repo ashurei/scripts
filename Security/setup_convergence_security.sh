@@ -6,7 +6,7 @@
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.10.07.r01"
+SCRIPT_VER="2026.10.07.r02"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -161,7 +161,7 @@ CRON_COMMENT="### Convergence Security"
 STEP_NAMES=(
     ""
     "[STEP 1] Install RPMS (ilorest, ipmitool)"
-    "[STEP 2] ilo_monitor - Create directory and move script files"
+    "[STEP 2] ilo/idrac monitor - Create directory and move script files"
     "[STEP 3] Execute script now"
     "[STEP 4] Check log file"
     "[STEP 5] Register crontab"
