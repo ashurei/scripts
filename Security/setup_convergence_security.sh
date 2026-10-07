@@ -6,7 +6,7 @@
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.10.07.r02"
+SCRIPT_VER="2026.10.07.r03"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -108,11 +108,11 @@ function mark_skipped() {
 
 function run_cmd() {
     local rc
-        if "$@"; then
-                return 0
-        else
+    if "$@"; then
+        return 0
+    else
         rc=$?
-            exit_with_error "$rc" "Execution failed: $*"
+        exit_with_error "$rc" "Execution failed: $*"
     fi
 }
 
@@ -181,7 +181,7 @@ echo "======================================================================="
 CURRENT_STEP=1
 
 # ===================================== #
-### Dell
+### Uncompress racadm files in Dell
 if [ "$VENDOR" = "DELL" ]; then
         if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
                 RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"                
@@ -233,11 +233,6 @@ fi
 if [ "$VENDOR" = "DELL" ]; then
         ### idrac-link-monitor enable
         run_cmd systemctl enable --now idrac-link-monitor
-        if [ -f "$IDRAC_MONITOR_LOG_FILE" ]; then
-                echo "[OK] Check idrac-link-monitor log file is completed."
-        else
-                exit_with_error 1 "There is no log file. : ${IDRAC_MONITOR_LOG_FILE}"
-        fi
 fi
 
 ### Check ipmitool binary
