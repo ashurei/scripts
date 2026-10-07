@@ -2,11 +2,11 @@
 ########################################################
 # Description : Setup convergence security
 # Create DATE : 2026.09.07
-# Last Update DATE : 2026.09.14 by ashurei
+# Last Update DATE : 2026.10.07 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.09.14.r06"
+SCRIPT_VER="2026.10.07.r01"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -250,7 +250,7 @@ mark_ok 1 "${BMC_PACKAGE}, ipmitool install is completed"
 
 echo
 echo "======================================================================="
-echo "[STEP 2] ilo_monitor - Create directory and move script files"
+echo "[STEP 2] ilo/idrac monitor - Create directory and move script files"
 echo "======================================================================="
 CURRENT_STEP=2
 
