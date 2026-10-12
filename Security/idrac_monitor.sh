@@ -2,7 +2,7 @@
 
 # iLO 모니터링 스크립트
 # 파일명: idrac_monitor.sh
-# 버젼: v12 2026.10.07
+# 버젼: v12 2026.10.12
 # 기능: iDRAC 로그 모니터링, 상태 감지, 자동 정리, 성능 측정
 
 SCRIPT_NAME="bmc_monitor"
@@ -21,7 +21,7 @@ LINK_MONITOR_OFFSET_FILE="${STATE_DIR}/${SCRIPT_NAME}_${MONITOR_TYPE}_link_monit
 HEALTH_STATE_FILE="${STATE_DIR}/${SCRIPT_NAME}_${MONITOR_TYPE}_health_state"
 LOCK_FILE="${TEMP_DIR}/${SCRIPT_NAME}_${MONITOR_TYPE}.lock"
 
-MAX_LOG_SIZE=10485760
+MAX_LOG_SIZE=5242880          # 5MB
 LOG_RETENTION_DAYS=30
 MAX_LOG_BACKUPS=10
 LOG_BACKUP_COMPRESS=true
@@ -41,7 +41,7 @@ acquire_lock() {
         lock_pid=$(cat "$LOCK_FILE" 2>/dev/null)
         if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
             echo "Another instance is already running (PID: $lock_pid)" >&2
-            exit 1
+            exit 106
         else
             rm -f "$LOCK_FILE"
         fi
@@ -50,10 +50,19 @@ acquire_lock() {
 }
 
 release_lock() {
-    rm -f "$LOCK_FILE"
+    if [ -f "$LOCK_FILE" ]; then
+        local lock_pid
+        lock_pid=$(cat "$LOCK_FILE" 2>/dev/null)
+
+        if [ "$lock_pid" = "$$" ]; then
+            rm -f "$LOCK_FILE"
+        fi
+    fi
 }
 
-trap release_lock EXIT INT TERM
+trap release_lock EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 log_rotation_message() {
     local message="$1"
@@ -64,7 +73,7 @@ log_rotation_message() {
     # log_message()를 호출하지 않는다. 재귀 rotate 방지 목적.
     echo "[$timestamp] $message" >> "$LOG_FILE" 2>/dev/null || true
 
-        if [ "$DEBUG_MODE" = "true" ]; then
+	if [ "$DEBUG_MODE" = "true" ]; then
         echo "[$timestamp] $message"
     fi
 
@@ -112,7 +121,7 @@ rotate_log_error() {
         echo "[$timestamp] ERROR: $message" >> "$LOG_FILE" 2>/dev/null || true
     fi
 
-        if [ "$DEBUG_MODE" = "true" ]; then
+	if [ "$DEBUG_MODE" = "true" ]; then
         echo "[$timestamp] ERROR: $message" >&2
     fi
 
@@ -200,8 +209,8 @@ send_alert() {
     if command -v logger >/dev/null 2>&1; then
         logger -t "$SCRIPT_NAME" "$alert_text"
     fi
-
-        return 0
+	
+	return 0
 }
 
 get_timestamp_ms() {
@@ -228,7 +237,7 @@ log_performance() {
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     rotate_log "$PERF_LOG"
     echo "[$timestamp] $operation: $(format_duration "$duration_ms") - $status $details" >> "$PERF_LOG"
-        if [ "$DEBUG_MODE" = "true" ]; then
+	if [ "$DEBUG_MODE" = "true" ]; then
         echo "PERF: $operation took $(format_duration "$duration_ms") - $status"
     fi
 
@@ -857,14 +866,14 @@ USAGE
 main() {
     if [ "$EUID" -ne 0 ]; then
         echo "ERROR: this script must be run as root (local racadm requires root)" >&2
-        exit 1
+        exit 101
     fi
 
     mkdir -p "$LOG_DIR" "$STATE_DIR"
 
     if [ ! -x "$RACADM" ]; then
         echo "ERROR: racadm not found at $RACADM" >&2
-        exit 1
+        exit 102
     fi
 
     acquire_lock
@@ -889,23 +898,23 @@ main() {
             ;;
         *)
             usage
-            exit 1
+            exit 103
             ;;
     esac
 
     show_version
 
     if [ "$(get_last_seq)" = "0" ] || [ ! -f "$SEQ_STATE_FILE" ]; then
-        initialize_state || exit 1
+        initialize_state || exit 104
         exit 0
     fi
 
-    analyze_lclog || exit 1
+    analyze_lclog || exit 105
     check_link_status_change || true
     check_sel_cleanup
     log_message "BMC log analysis completed"
-
-        return 0
+	
+    return 0
 }
 
 main "$@"
