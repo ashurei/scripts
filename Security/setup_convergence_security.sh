@@ -6,7 +6,7 @@
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.10.12.r01"
+SCRIPT_VER="2026.10.12.r03"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -184,12 +184,12 @@ CURRENT_STEP=1
 ### Uncompress racadm files in Dell
 if [ "$VENDOR" = "DELL" ]; then
     if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
-        RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"
+        RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"                
         RACADM_TMP_DIR="${BASE_DIR}/temp_racadm"
         RACADM_INSTALL="${RACADM_TMP_DIR}/iDRACTools/racadm/install_racadm.sh"
 
         [ -f "$RACADM_ARCHIVE" ] || exit_with_error 1 "racadm archive is not found: $RACADM_ARCHIVE"
-
+        
         run_cmd rm -rf "$RACADM_TMP_DIR"
         run_cmd mkdir -p "$RACADM_TMP_DIR"
         run_cmd tar xfz "$RACADM_ARCHIVE" -C "$RACADM_TMP_DIR"
@@ -199,7 +199,7 @@ if [ "$VENDOR" = "DELL" ]; then
             if [ ! -x "$RACADM_INSTALL" ]; then
                 run_cmd chmod +x "$RACADM_INSTALL"
             fi
-
+                
             if (cd "${RACADM_TMP_DIR}/iDRACTools/racadm" && ./install_racadm.sh); then
                 echo "[OK] racadm installation completed."
             else
@@ -207,6 +207,7 @@ if [ "$VENDOR" = "DELL" ]; then
                 exit_with_error "$rc" "racadm install script failed."
             fi
     fi
+    
     # Post check
     if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
         exit_with_error 1 "$RACADM_PACKAGE is not installed."
@@ -225,7 +226,7 @@ then
 fi
 
 ### Perform net-snmp, net-snmp-agent-libs
-if rpm -q net-snmp-agent-libs > /dev/null 2>&1; then
+if rpm -q net-snmp net-snmp-agent-libs > /dev/null 2>&1; then
     RPM_FILES+=("${RPM_DIR}/extra/net-snmp-*.rpm")
 fi
 
@@ -295,6 +296,21 @@ echo "======================================================================="
 CURRENT_STEP=3
 
 ### cron script
+if [ "$VENDOR" = "DELL" ]; then
+    for retry in 1 2 3 4 5
+    do
+        if timeout 30 "$RACADM_BIN" lclog view -n 1 >/dev/null 2>&1; then
+            echo "[OK] RACADM Lifecycle Log is ready."
+            break
+        fi
+        if [ "$retry" -eq 5 ]; then
+            exit_with_error 5 "RACADM Lifecycle Log is not ready."
+        fi
+            echo "[WAIT] RACADM Lifecycle Log is not ready. retry=${retry}/5"
+        sleep 5
+    done
+fi
+
 echo "[INFO] Execute cron script : ${DST_CRON_SCRIPT}"
 run_cmd "$DST_CRON_SCRIPT"
 
