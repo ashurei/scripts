@@ -2,11 +2,11 @@
 ########################################################
 # Description : Setup convergence security
 # Create DATE : 2026.09.07
-# Last Update DATE : 2026.10.07 by ashurei
+# Last Update DATE : 2026.10.12 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.10.07.r03"
+SCRIPT_VER="2026.10.12.r01"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -17,16 +17,16 @@ set -euo pipefail
 VIRT_TYPE=$(systemd-detect-virt 2>/dev/null || true)
 if [ "$VIRT_TYPE" != "none" ] && [ -n "$VIRT_TYPE" ]
 then
-        echo "[ERROR] This machine is Virtual Server."
-        echo "[ERROR] Virtualization: $VIRT_TYPE"
-        exit 1
+    echo "[ERROR] This machine is Virtual Server."
+    echo "[ERROR] Virtualization: $VIRT_TYPE"
+    exit 1
 fi
 
 ### Check root permission
 if [ "$(id -u)" -ne 0 ]
 then
-        echo "[ERROR] You have to execute this script with 'sudo' or 'root'."
-        exit 1
+    echo "[ERROR] You have to execute this script with 'sudo' or 'root'."
+    exit 1
 fi
 
 ### Check manufacturer
@@ -36,16 +36,16 @@ echo "Manufacturer: $MANUFACTURER"
 echo "Product     : $PRODUCT"
 
 case "$MANUFACTURER" in
-        *HPE*|*HP*|*Hewlett-Packard*)
-                VENDOR="HP"
-                ;;
-        *Dell*)
-                VENDOR="DELL"
-                ;;
-        *)
-                echo "[ERROR] This script supports only HP and DELL server"
-                exit 1
-                ;;
+    *HPE*|*HP*|*Hewlett-Packard*)
+        VENDOR="HP"
+        ;;
+    *Dell*)
+        VENDOR="DELL"
+        ;;
+    *)
+        echo "[ERROR] This script supports only HP and DELL server"
+        exit 1
+        ;;
 esac
 
 
@@ -117,12 +117,12 @@ function run_cmd() {
 }
 
 function detect_rhel_major() {
-        local os_major=""
-        [ -r /etc/os-release ] || return 1
-        source /etc/os-release
-        os_major="${VERSION_ID:-}"
-        [ -n "$os_major" ] || return 1
-        printf '%s\n' "${os_major%%.*}"
+    local os_major=""
+    [ -r /etc/os-release ] || return 1
+    source /etc/os-release
+    os_major="${VERSION_ID:-}"
+    [ -n "$os_major" ] || return 1
+    printf '%s\n' "${os_major%%.*}"
 }
 
 # ========================================================================================== #
@@ -131,27 +131,27 @@ BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 ### Set to install rpm name with vendor
 OS_MAJOR=$(detect_rhel_major) || {
-        echo "[ERROR] Unable to detect OS major version."
-        exit 1
+    echo "[ERROR] Unable to detect OS major version."
+    exit 1
 }
 
 case "$VENDOR" in
-        HP)
-                BMC_PACKAGE="ilorest"
-                RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/hp"
-                CRON_SCRIPT="ilo_monitor.sh"
-                BMC_DIR="/root/ilo_monitor"
-                ;;
-        DELL)
-                BMC_PACKAGE="idrac-link-monitor"
-                RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/dell"
-                CRON_SCRIPT="idrac_monitor.sh"
-                RACADM_TAR_FILE="Dell-iDRACTools-Web-LX-11.3.0.0-795_A00.tar.gz"
-                RACADM_PACKAGE="srvadmin-idracadm7"
-                RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
-                IDRAC_MONITOR_LOG_FILE="/var/log/idrac_link_monitor.log"
-                BMC_DIR="/root/idrac_monitor"
-                ;;
+    HP)
+        BMC_PACKAGE="ilorest"
+        RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/hp"
+        CRON_SCRIPT="ilo_monitor.sh"
+        BMC_DIR="/root/ilo_monitor"
+        ;;
+    DELL)
+        BMC_PACKAGE="idrac-link-monitor"
+        RPM_DIR="${BASE_DIR}/rpms/el${OS_MAJOR}/dell"
+        CRON_SCRIPT="idrac_monitor.sh"
+        RACADM_TAR_FILE="Dell-iDRACTools-Web-LX-11.3.0.0-795_A00.tar.gz"
+        RACADM_PACKAGE="srvadmin-idracadm7"
+        RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
+        IDRAC_MONITOR_LOG_FILE="/var/log/idrac_link_monitor.log"
+        BMC_DIR="/root/idrac_monitor"
+        ;;
 esac
 
 RUN_SCRIPT="find_idle_ports.sh"
@@ -183,37 +183,37 @@ CURRENT_STEP=1
 # ===================================== #
 ### Uncompress racadm files in Dell
 if [ "$VENDOR" = "DELL" ]; then
-        if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
-                RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"                
-                RACADM_TMP_DIR="${BASE_DIR}/temp_racadm"
-                RACADM_INSTALL="${RACADM_TMP_DIR}/iDRACTools/racadm/install_racadm.sh"
+    if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
+        RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"
+        RACADM_TMP_DIR="${BASE_DIR}/temp_racadm"
+        RACADM_INSTALL="${RACADM_TMP_DIR}/iDRACTools/racadm/install_racadm.sh"
 
-                [ -f "$RACADM_ARCHIVE" ] || exit_with_error 1 "racadm archive is not found: $RACADM_ARCHIVE"
-                
-                run_cmd rm -rf "$RACADM_TMP_DIR"
-                run_cmd mkdir -p "$RACADM_TMP_DIR"
-                run_cmd tar xfz "$RACADM_ARCHIVE" -C "$RACADM_TMP_DIR"
+        [ -f "$RACADM_ARCHIVE" ] || exit_with_error 1 "racadm archive is not found: $RACADM_ARCHIVE"
 
-                [ -f "$RACADM_INSTALL" ] || exit_with_error 1 "racadm installer is not found: $RACADM_INSTALL"
+        run_cmd rm -rf "$RACADM_TMP_DIR"
+        run_cmd mkdir -p "$RACADM_TMP_DIR"
+        run_cmd tar xfz "$RACADM_ARCHIVE" -C "$RACADM_TMP_DIR"
 
-                if [ ! -x "$RACADM_INSTALL" ]; then
-                        run_cmd chmod +x "$RACADM_INSTALL"
-                fi
-                
-                if (cd "${RACADM_TMP_DIR}/iDRACTools/racadm" && ./install_racadm.sh); then
-                        echo "[OK] racadm installation completed."
-                else
-                        rc=$?
-                        exit_with_error "$rc" "racadm install script failed."
-                fi
-        fi
-        # Post check
-        if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
-                exit_with_error 1 "$RACADM_PACKAGE is not installed."
-        fi
-        if ! command -v racadm >/dev/null 2>&1 && [ ! -x "$RACADM_BIN" ]; then
-                exit_with_error 1 "racadm binary is not exists."
-        fi
+        [ -f "$RACADM_INSTALL" ] || exit_with_error 1 "racadm installer is not found: $RACADM_INSTALL"
+
+            if [ ! -x "$RACADM_INSTALL" ]; then
+                run_cmd chmod +x "$RACADM_INSTALL"
+            fi
+
+            if (cd "${RACADM_TMP_DIR}/iDRACTools/racadm" && ./install_racadm.sh); then
+                echo "[OK] racadm installation completed."
+            else
+                rc=$?
+                exit_with_error "$rc" "racadm install script failed."
+            fi
+    fi
+    # Post check
+    if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
+        exit_with_error 1 "$RACADM_PACKAGE is not installed."
+    fi
+    if ! command -v racadm >/dev/null 2>&1 && [ ! -x "$RACADM_BIN" ]; then
+        exit_with_error 1 "racadm binary is not exists."
+    fi
 fi
 # ===================================== #
 
@@ -221,18 +221,24 @@ fi
 RPM_FILES=("$RPM_DIR"/*.rpm)
 if [ ! -e "${RPM_FILES[0]}" ]
 then
-        exit_with_error 1 "No BMC RPM files: $RPM_DIR"
+    exit_with_error 1 "No BMC RPM files: $RPM_DIR"
 fi
+
+### Perform net-snmp, net-snmp-agent-libs
+if rpm -q net-snmp-agent-libs > /dev/null 2>&1; then
+    RPM_FILES+=("${RPM_DIR}/extra/net-snmp-*.rpm")
+fi
+
 yum install -y --disablerepo='*' "${RPM_FILES[@]}" || true
 
 if ! rpm -q "$BMC_PACKAGE" >/dev/null 2>&1; then
-        exit_with_error 1 "$BMC_PACKAGE is not installed."
+    exit_with_error 1 "$BMC_PACKAGE is not installed."
 fi
 
 ### Start & enable idrac-link-monitor
 if [ "$VENDOR" = "DELL" ]; then
-        ### idrac-link-monitor enable
-        run_cmd systemctl enable --now idrac-link-monitor
+    ### idrac-link-monitor enable
+    run_cmd systemctl enable --now idrac-link-monitor
 fi
 
 ### Check ipmitool binary
@@ -334,25 +340,25 @@ CRON_JOB2="* * * * * sleep 30; ${FLOCK_BIN} -n /var/run/bmc_monitor.lock ${DST_C
 CURRENT_CRON=$(crontab -u "$CRON_USER" -l 2>/dev/null || true)
 
 if echo "$CURRENT_CRON" | grep -Fqx "$CRON_JOB1" &&
-   echo "$CURRENT_CRON" | grep -Fqx "$CRON_JOB2"; then
+    echo "$CURRENT_CRON" | grep -Fqx "$CRON_JOB2"; then
     echo "[SKIP] Crontab script is already registerd."
     mark_skipped 5 "Crontab script is already registerd."
 elif (
-        echo "$CURRENT_CRON"
-        echo "$CRON_COMMENT"
-        echo "$CRON_JOB1"
-        echo "$CRON_JOB2"
-        ) | crontab -u "$CRON_USER" -
+    echo "$CURRENT_CRON"
+    echo "$CRON_COMMENT"
+    echo "$CRON_JOB1"
+    echo "$CRON_JOB2"
+    ) | crontab -u "$CRON_USER" -
 then
-        echo "[OK] Register crontab is succeeded."
-        echo "[CRONTAB]"
-        echo "$CRON_COMMENT"
-        echo "${CRON_JOB1}"
-        echo "${CRON_JOB2}"
-        mark_ok 5 "Register crontab is succeeded."
+    echo "[OK] Register crontab is succeeded."
+    echo "[CRONTAB]"
+    echo "$CRON_COMMENT"
+    echo "${CRON_JOB1}"
+    echo "${CRON_JOB2}"
+    mark_ok 5 "Register crontab is succeeded."
 else
-        rc=$?
-        exit_with_error "$rc" "Register crontab is failed."
+    rc=$?
+    exit_with_error "$rc" "Register crontab is failed."
 fi
 
 FAILED_RC=0
