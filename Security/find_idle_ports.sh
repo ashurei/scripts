@@ -3,13 +3,16 @@
 # 목적: 케이블 미연결(링크 미감지) 물리 NIC을 찾아 down하고,
 #       NM 관리면 autoconnect=no, 레거시면 ONBOOT=no로 설정.
 # 기본은 DRY-RUN. --apply 로 실제 적용.
-# 옵션: --verbose, --link-only (링크 미감지만으로 대상 선정)
+# 옵션: --verbose, --link-only (링크 미감지만으로 대상 선정), --dir (ifcfg 백업 디렉토리)
+
+# 버젼: v3 2026.10.14
 
 set -u
 
 APPLY=0
 VERBOSE=0
 LINK_ONLY=0
+BACKUP_DIR="/root/ifcfg_backup"
 
 log(){ echo "[*] $*"; }
 vlog(){ [ "$VERBOSE" -eq 1 ] && echo "[v] $*"; }
@@ -18,10 +21,11 @@ die(){ echo "[x] $*" >&2; exit 1; }
 
 usage(){
   cat <<EOF
-Usage: $0 [--apply] [--verbose] [--link-only] [-h|--help]
+Usage: $0 [--apply] [--verbose] [--link-only] [--dir DIR] [-h|--help]
   --apply       실제 적용(기본: DRY-RUN)
   --verbose     상세 로그
   --link-only   링크 미감지(carrier=0)만으로 대상 선정(주소/라우트 검사를 생략)
+  --dir DIR     ifcfg 백업 디렉토리(기본: /root/ifcfg_backup)
 EOF
 }
 
@@ -30,6 +34,16 @@ while [ $# -gt 0 ]; do
     --apply) APPLY=1;;
     --verbose) VERBOSE=1;;
     --link-only) LINK_ONLY=1;;
+    --dir)
+      [ $# -ge 2 ] || die "--dir 옵션에 백업 디렉토리 경로가 필요합니다."
+      [ -n "$2" ] || die "--dir 옵션에 빈 경로를 사용할 수 없습니다."
+      BACKUP_DIR="$2"
+      shift
+      ;;
+    --dir=*)
+      BACKUP_DIR="${1#*=}"
+      [ -n "$BACKUP_DIR" ] || die "--dir 옵션에 빈 경로를 사용할 수 없습니다."
+      ;;
     -h|--help) usage; exit 0;;
     *) warn "Unknown option: $1"; usage; exit 1;;
   esac
@@ -53,7 +67,7 @@ is_physical(){ [ -e "/sys/class/net/$1/device" ]; }
 is_loopback(){ [ "$1" = "lo" ]; }
 has_master(){ [ -e "/sys/class/net/$1/master" ]; }
 
-is_admin_up(){
+is_admin_up(){ 
   local dev="$1"
   if [ $HAVE_IP -eq 1 ]; then
     ip -o link show dev "$dev" 2>/dev/null | grep -qw "UP"
@@ -183,18 +197,24 @@ get_ifcfg_value(){
 }
 
 legacy_onboot_off(){
-  local dev="$1" ifcfg="/etc/sysconfig/network-scripts/ifcfg-$dev" ts
+  local dev="$1" ifcfg="/etc/sysconfig/network-scripts/ifcfg-$dev" ts backup_file
   ts="$(date +%Y%m%d%H%M%S)"
   if [ ! -f "$ifcfg" ]; then
     vlog "$dev: ifcfg 없음 ($ifcfg)"
     return 0
   fi
+  backup_file="${BACKUP_DIR}/$(basename "$ifcfg").bak.${ts}"
   local cur_onboot cur_nmctrl
   cur_onboot="$(get_ifcfg_value "$ifcfg" "ONBOOT" | tr '[:upper:]' '[:lower:]')"
   cur_nmctrl="$(get_ifcfg_value "$ifcfg" "NM_CONTROLLED" | tr '[:upper:]' '[:lower:]')"
 
   if [ "$APPLY" -eq 1 ]; then
-    cp -p "$ifcfg" "${ifcfg}.bak.$ts" 2>/dev/null
+    if ! mkdir -p "$BACKUP_DIR"; then
+      die "ifcfg 백업 디렉토리 생성 실패: $BACKUP_DIR"
+    fi
+    if ! cp -p "$ifcfg" "$backup_file"; then
+      die "ifcfg 백업 실패: $ifcfg -> $backup_file"
+    fi
     # ONBOOT
     if grep -Eq '^[[:space:]]*ONBOOT[[:space:]]*=' "$ifcfg"; then
       [ "$cur_onboot" = "no" ] || sed -i -E 's/^[[:space:]]*ONBOOT[[:space:]]*=.*/ONBOOT=no/' "$ifcfg"
@@ -209,7 +229,7 @@ legacy_onboot_off(){
     else
       echo 'NM_CONTROLLED=no' >> "$ifcfg"; log "$dev: NM_CONTROLLED 미설정 -> NM_CONTROLLED=no 추가(적용)"
     fi
-    log "$dev: ifcfg 백업: ${ifcfg}.bak.$ts"
+    log "$dev: ifcfg 백업: $backup_file"
   else
     if grep -Eq '^[[:space:]]*ONBOOT[[:space:]]*=' "$ifcfg"; then
       [ "$cur_onboot" = "no" ] && log "DRY-RUN: $dev ONBOOT 현재=no -> 변경 없음" || log "DRY-RUN: $dev ONBOOT 현재=$(echo ${cur_onboot:-<unset>}) -> 예정: no로 변경"
@@ -221,7 +241,7 @@ legacy_onboot_off(){
     else
       log "DRY-RUN: $dev NM_CONTROLLED 현재=미설정 -> 예정: NM_CONTROLLED=no 추가"
     fi
-    log "DRY-RUN: 적용 시 백업 예정: ${ifcfg}.bak.$ts"
+    log "DRY-RUN: 적용 시 백업 예정: $backup_file"
   fi
 }
 
