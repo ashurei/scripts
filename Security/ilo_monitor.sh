@@ -2,7 +2,7 @@
 
 # iLO 모니터링 스크립트
 # 파일명: ilo_monitor.sh
-# 버젼: v4 2026.06.01
+# 버젼: v5 2026.10.07
 # 기능: iLO 로그 모니터링, 상태 감지, 자동 정리, 성능 측정,  EventNumber/RecordId 호환 버전
 
 SCRIPT_NAME="bmc_monitor"
@@ -13,30 +13,31 @@ ALERT_LOG="${LOG_DIR}/${SCRIPT_NAME}_alerts.log"
 PERF_LOG="${LOG_DIR}/${SCRIPT_NAME}_performance.log"
 STATE_FILE="/var/lib/${SCRIPT_NAME}_${MONITOR_TYPE}_state"
 HEALTH_STATE_FILE="/var/lib/${SCRIPT_NAME}_${MONITOR_TYPE}_health_state"
+ILOREST="/sbin/ilorest"
 TEMP_DIR="/var/tmp/ilorest_tmp"
 LOCK_FILE="${TEMP_DIR}/${SCRIPT_NAME}_${MONITOR_TYPE}.lock"
 CURRENT_ILOREST_TMP=""
 
 # 로그 로테이션 설정
-MAX_LOG_SIZE=10485760          # 10MB
-LOG_RETENTION_DAYS=30          # 로그 백업 보관 일수
+MAX_LOG_SIZE=5242880          # 5MB
+LOG_RETENTION_DAYS=30         # 로그 백업 보관 일수
 MAX_LOG_BACKUPS=10            # 최대 백업 파일 개수
-LOG_BACKUP_COMPRESS=true       # 백업 파일 압축 여부
+LOG_BACKUP_COMPRESS=true      # 백업 파일 압축 여부
 
 # iLO 상태 모니터링 설정
 MAX_CONSECUTIVE_FAILURES=3     # 연속 실패 허용 횟수
-TIMEOUT_SECONDS=30            # ilorest 명령어 타임아웃
+TIMEOUT_SECONDS=30             # ilorest 명령어 타임아웃
 
 # iLO 로그 정리 설정
 ENABLE_LOG_CLEANUP=true        # 로그 정리 활성화 여부
-MIN_LOGS_TO_KEEP=20           # 최소 보관할 로그 개수
-MAX_LOGS_BEFORE_CLEANUP=50   # 이 개수 초과시 정리 수행
-BACKUP_BEFORE_CLEANUP=true    # 정리 전 백업 여부
+MIN_LOGS_TO_KEEP=20            # 최소 보관할 로그 개수
+MAX_LOGS_BEFORE_CLEANUP=50     # 이 개수 초과시 정리 수행
+BACKUP_BEFORE_CLEANUP=true     # 정리 전 백업 여부
 
 # 백업 정리 설정
-BACKUP_RETENTION_DAYS=7       # 백업 보관 일수
-MAX_BACKUP_FILES=30          # 최대 백업 파일 개수
-MAX_BACKUP_SIZE_MB=100       # 백업 디렉토리 최대 크기 (MB)
+BACKUP_RETENTION_DAYS=7        # 백업 보관 일수
+MAX_BACKUP_FILES=30            # 최대 백업 파일 개수
+MAX_BACKUP_SIZE_MB=100         # 백업 디렉토리 최대 크기 (MB)
 
 # 락 관리
 acquire_lock() {
@@ -177,10 +178,10 @@ rotate_log() {
 log_message() {
     local message="$1"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)
-
+    
     rotate_log "$LOG_FILE"
     echo "[$timestamp] $message" >> "$LOG_FILE"
-
+    
     if [ "$DEBUG_MODE" = "true" ]; then
         echo "[$timestamp] $message"
     fi
@@ -191,15 +192,15 @@ send_alert() {
     local message="$2"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)
     local alert_text="CODE=${code} ALERT: ${message}"
-
+    
     log_message "$alert_text"
     rotate_log "$ALERT_LOG"
     echo "[$timestamp] $alert_text" >> "$ALERT_LOG"
-
+    
     if [ "$DEBUG_MODE" = "true" ]; then
         echo "[$timestamp] $alert_text"
     fi
-
+    
     if command -v logger >/dev/null 2>&1; then
         logger -t "$SCRIPT_NAME" "$alert_text"
     fi
@@ -231,7 +232,7 @@ get_failure_count() {
 save_failure_count() {
     local count="$1"
     mkdir -p "$(dirname "$HEALTH_STATE_FILE")" 2>/dev/null
-
+    
     if [ -f "$HEALTH_STATE_FILE" ]; then
         sed -i "s/^failure_count=.*/failure_count=$count/" "$HEALTH_STATE_FILE" 2>/dev/null || echo "failure_count=$count" >> "$HEALTH_STATE_FILE"
     else
@@ -250,7 +251,7 @@ get_last_success_time() {
 save_last_success_time() {
     local timestamp="$1"
     mkdir -p "$(dirname "$HEALTH_STATE_FILE")" 2>/dev/null
-
+    
     if [ -f "$HEALTH_STATE_FILE" ]; then
         sed -i "s/^last_success=.*/last_success=$timestamp/" "$HEALTH_STATE_FILE" 2>/dev/null || echo "last_success=$timestamp" >> "$HEALTH_STATE_FILE"
     else
@@ -271,7 +272,7 @@ format_duration() {
     local duration_ms="$1"
     local duration_s=$((duration_ms / 1000))
     local ms_part=$((duration_ms % 1000))
-
+    
     if [ $duration_s -gt 0 ]; then
         echo "${duration_s}.${ms_part}s"
     else
@@ -285,10 +286,10 @@ log_performance() {
     local status="$3"
     local details="$4"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-
+    
     rotate_log "$PERF_LOG"
     echo "[$timestamp] $operation: $(format_duration $duration_ms) - $status $details" >> "$PERF_LOG"
-
+    
     if [ "$DEBUG_MODE" = "true" ]; then
         echo "PERF: $operation took $(format_duration $duration_ms) - $status"
     fi
@@ -319,10 +320,10 @@ run_ilorest() {
     CURRENT_ILOREST_TMP="$run_tmp"
 
     if [ "$TIMEOUT_SECONDS" -gt 0 ] && command -v timeout >/dev/null 2>&1; then
-        TMPDIR="$run_tmp" timeout --kill-after=5 "$TIMEOUT_SECONDS" ilorest "$@"
+        TMPDIR="$run_tmp" timeout --kill-after=5 "$TIMEOUT_SECONDS" "$ILOREST" "$@"
         rc=$?
     else
-        TMPDIR="$run_tmp" ilorest "$@"
+        TMPDIR="$run_tmp" "$ILOREST" "$@"
         rc=$?
     fi
 
@@ -337,7 +338,7 @@ check_ilo_communication_health() {
     local success="$1"
     local current_time=$(date +%s)
     local failure_count=$(get_failure_count)
-
+    
     if [ "$success" = "true" ]; then
         save_failure_count "0"
         save_last_success_time "$current_time"
@@ -345,18 +346,18 @@ check_ilo_communication_health() {
     else
         failure_count=$((failure_count + 1))
         save_failure_count "$failure_count"
-
+        
         log_message "iLO communication failed (consecutive failures: $failure_count)"
-
+        
         if [ "$failure_count" -ge "$MAX_CONSECUTIVE_FAILURES" ]; then
             local last_success=$(get_last_success_time)
             local duration="unknown"
-
+            
             if [ "$last_success" != "0" ]; then
                 duration=$(( (current_time - last_success) / 60 ))
                 duration="${duration} minutes"
             fi
-
+            
             send_alert "BMC-COMM-001" "iLO communication outage - $failure_count consecutive failures (last success: $duration ago)"
         fi
     fi
@@ -366,12 +367,12 @@ check_ilo_communication_health() {
 get_total_log_count() {
     local temp_log="${TEMP_DIR}/ilo_count_$$.log"
     local count=0
-
+    
     if run_ilorest serverlogs --selectlog=IEL > "$temp_log" 2>/dev/null; then
         count=$(grep -c "^@odata.context=" "$temp_log" 2>/dev/null || echo "0")
         rm -f "$temp_log"
     fi
-
+    
     echo "$count"
 }
 
@@ -462,20 +463,20 @@ cleanup_old_backups() {
 backup_ilo_logs() {
     local backup_dir="${LOG_DIR}/${SCRIPT_NAME}_${MONITOR_TYPE}_backups"
     local backup_file="${backup_dir}/${SCRIPT_NAME}_${MONITOR_TYPE}_logs_$(date +%Y%m%d_%H%M%S).$$.log"
-
+    
     mkdir -p "$backup_dir" 2>/dev/null
-
+    
     log_message "BMC log backup started: $backup_file"
-
+    
     if run_ilorest serverlogs --selectlog=IEL > "$backup_file" 2>/dev/null; then
         local backup_size=$(stat -c%s "$backup_file" 2>/dev/null || echo "0")
         local backup_size_kb=$((backup_size / 1024))
-
+        
         log_message "BMC log backup completed: $backup_file (${backup_size_kb}KB)"
-
+        
         # 백업 파일 정리 수행
         cleanup_old_backups
-
+        
         return 0
     else
         log_message "ERROR: BMC log backup failed"
@@ -490,18 +491,18 @@ safe_cleanup_ilo_logs() {
         log_message "Log cleanup is disabled"
         return 0
     fi
-
+    
     local total_logs=$(get_total_log_count)
     log_message "Current BMC log count: $total_logs"
-
+    
     # 정리 필요성 검사
     if [ "$total_logs" -le "$MAX_LOGS_BEFORE_CLEANUP" ]; then
         log_message "Log cleanup not required (current: $total_logs, threshold: $MAX_LOGS_BEFORE_CLEANUP)"
         return 0
     fi
-
+    
     log_message "Log cleanup required - threshold exceeded (current: $total_logs, threshold: $MAX_LOGS_BEFORE_CLEANUP)"
-
+    
     # 백업 수행 (옵션)
     if [ "$BACKUP_BEFORE_CLEANUP" = "true" ]; then
         if ! backup_ilo_logs; then
@@ -509,26 +510,26 @@ safe_cleanup_ilo_logs() {
             return 1
         fi
     fi
-
+    
     # 로그 정리 수행
     log_message "BMC log cleanup started"
-
+    
     local cleanup_start_time=$(get_timestamp_ms)
-
+    
     if run_ilorest serverlogs --selectlog=IEL --clearlog 2>/dev/null; then
         local cleanup_end_time=$(get_timestamp_ms)
         local cleanup_duration=$((cleanup_end_time - cleanup_start_time))
-
+        
         log_performance "log_cleanup" "$cleanup_duration" "SUCCESS" "(cleared $total_logs logs)"
         log_message "BMC log cleanup completed - deleted $total_logs logs (duration: $(format_duration $cleanup_duration))"
-
+        
         # 상태 초기화
         save_last_event_number "0"
         log_message "EventNumber state reset - next run will start from a new baseline"
-
+        
         # 알림 기록
         send_alert "BMC-CLEANUP-001" "iLO log auto-cleanup completed - deleted $total_logs logs (backup: $BACKUP_BEFORE_CLEANUP)"
-
+        
         return 0
     else
         log_message "ERROR: BMC log cleanup failed"
@@ -540,16 +541,16 @@ safe_cleanup_ilo_logs() {
 initialize_state() {
     local temp_log="${TEMP_DIR}/ilo_init_$$.log"
     local max_event_number=0
-
+    
     log_message "First run detected - monitoring will start from the current point"
-
+    
     if ! run_ilorest serverlogs --selectlog=IEL > "$temp_log" 2>/dev/null; then
         log_message "ERROR: ilorest command failed or timed out"
         check_ilo_communication_health "false"
         rm -f "$temp_log"
         return 1
     fi
-
+    
     # 로그 파일 유효성 검사
     if [ ! -s "$temp_log" ]; then
         log_message "ERROR: BMC log output is empty"
@@ -557,7 +558,7 @@ initialize_state() {
         rm -f "$temp_log"
         return 1
     fi
-
+    
     # JSON/데이터 형식 검증
     if ! grep -q "^@odata.context=" "$temp_log" 2>/dev/null; then
         log_message "ERROR: BMC log format is invalid"
@@ -565,7 +566,7 @@ initialize_state() {
         rm -f "$temp_log"
         return 1
     fi
-
+    
     local current_event_number=""
     local current_record_id=""
     local init_in_entry=false
@@ -624,9 +625,9 @@ initialize_state() {
     if [ "$init_in_entry" = true ]; then
         process_init_entry
     fi
-
+    
     rm -f "$temp_log"
-
+    
     if [ "$max_event_number" -gt 0 ]; then
         save_last_event_number "$max_event_number"
         log_message "Initialization completed - last EventNumber/RecordId: $max_event_number"
@@ -636,7 +637,7 @@ initialize_state() {
         log_message "Initialization completed - EventNumber/RecordId not found"
         check_ilo_communication_health "false"
     fi
-
+    
     return 0
 }
 
@@ -652,31 +653,31 @@ analyze_ilo_health() {
     local created="$2"
     local severity="$3"
     local event_number="$4"
-
+    
     local message_lower=$(echo "$message" | tr '[:upper:]' '[:lower:]')
-
+    
     # iLO 하드웨어/펌웨어 문제
     if echo "$message_lower" | grep -q "ilo reset by watchdog"; then
         send_alert "BMC-HW-001" "iLO watchdog reset detected - controller restarted due to an abnormal state ($created) [EventNumber: $event_number]"
         return 0
     fi
-
+    
     if echo "$message_lower" | grep -q "ilo self test error"; then
         send_alert "BMC-HW-002" "iLO self-test error - controller hardware may have an issue ($created) [EventNumber: $event_number]"
         return 0
     fi
-
+    
     if echo "$message_lower" | grep -q "embedded flash.*failed\|embedded media manager failed"; then
         send_alert "BMC-STOR-001" "iLO embedded flash error - storage issue may affect functionality ($created) [EventNumber: $event_number]"
         return 0
     fi
-
+    
     # iLO 보안 상태 문제
     if echo "$message_lower" | grep -q "security state.*risk\|overall security.*risk"; then
         send_alert "BMC-SEC-001" "iLO security risk state - check system security settings ($created) [EventNumber: $event_number]"
         return 0
     fi
-
+    
     # iLO 네트워크 관련 문제
     if echo "$message_lower" | grep -q "ilo.*network.*error\|network.*ilo.*failed"; then
         send_alert "BMC-NET-001" "iLO network error - check network connectivity or configuration ($created) [EventNumber: $event_number] iLO 네트워크 오류/실패"
@@ -708,13 +709,13 @@ analyze_ilo_health() {
         send_alert "BMC-AUTH-001" "iLO authentication failure - possible unauthorized access attempt or account issue ($created) [EventNumber: $event_number] iLO 로그인 시도 및 로그인 인증 실패 발생"
         return 0
     fi
-
+    
     # iLO 라이센스 문제
     if echo "$message_lower" | grep -q "license.*expired\|license.*invalid"; then
         send_alert "BMC-LIC-001" "iLO license issue - license expired or invalid ($created) [EventNumber: $event_number]"
         return 0
     fi
-
+    
     # 기타 Critical/Warning 레벨 iLO 메시지
     if [ "$severity" = "Critical" ] && echo "$message_lower" | grep -q "ilo"; then
         send_alert "BMC-CRIT-001" "iLO critical error: $message ($created) [EventNumber: $event_number]"
@@ -842,26 +843,26 @@ analyze_event() {
     local created="$2"
     local severity="$3"
     local event_number="$4"
-
+    
     log_message "Analyzing event: EventNumber=$event_number, Message=$message"
-
+    
     # iLO 상태/인증 분석에서 alert를 처리했으면 성공 로그인 분석으로 넘어가지 않는다.
     if analyze_ilo_health "$message" "$created" "$severity" "$event_number"; then
         return
     fi
-
+    
     local message_lower
     message_lower=$(echo "$message" | tr '[:upper:]' '[:lower:]')
-
+    
     # 기존 네트워크 모니터링
     if echo "$message_lower" | grep -q "network link up\|link up"; then
         local speed=$(echo "$message" | grep -o '[0-9]\+ Mbps' || echo "unknown speed")
         send_alert "BMC-NET-002" "iLO network link UP - $speed ($created) [EventNumber: $event_number]"
-
+        
     elif echo "$message_lower" | grep -q "network link down\|link down"; then
         send_alert "BMC-NET-003" "iLO network link DOWN ($created) [EventNumber: $event_number]"
     fi
-
+    
 
 
     # 기존 로그인 모니터링
@@ -869,7 +870,7 @@ analyze_event() {
         if ! echo "$message_lower" | grep -q "localhost\|127\.0\.0\.1\|::1"; then
             local ip_address=$(echo "$message" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')
             local username=$(echo "$message" | sed -n 's/.*Browser login: \([^-]*\) -.*/\1/p' | sed 's/[[:space:]]*$//')
-
+            
             if [ -n "$ip_address" ]; then
                 send_alert "BMC-ACCESS-001" "iLO browser login - user: $username, IP: $ip_address ($created) [EventNumber: $event_number]  iLO 브라우저 또는 GUI 로그인"
             else
@@ -912,7 +913,7 @@ analyze_event() {
             fi
         fi
     fi
-
+    
 
 
     # 로그아웃 모니터링 - login/access 오탐 방지를 위해 로그인 검사보다 먼저 처리한다.
@@ -968,7 +969,7 @@ analyze_event() {
         fi
         return
     fi
-
+    
     if echo "$message_lower" | grep -q "reset to factory defaults"; then
         send_alert "BMC-CONFIG-001" "iLO factory reset detected ($created) [EventNumber: $event_number]"
     fi
@@ -984,16 +985,16 @@ parse_ilorest_output() {
     local current_created=""
     local current_severity=""
     local in_entry=false
-
+    
     log_message "Last processed EventNumber/RecordId: $last_event_number"
-
+    
     process_current_entry() {
         if [ -n "$current_event_number" ] && [ -n "$current_message" ]; then
             if echo "$current_event_number" | grep -q "^[0-9]\+$"; then
                 if [ "$current_event_number" -gt "$last_event_number" ]; then
                     analyze_event "$current_message" "$current_created" "$current_severity" "$current_event_number"
                     new_entries_count=$((new_entries_count + 1))
-
+                    
                     if [ "$current_event_number" -gt "$max_event_number" ]; then
                         max_event_number=$current_event_number
                     fi
@@ -1001,9 +1002,9 @@ parse_ilorest_output() {
             fi
         fi
     }
-
+    
     local skip_header=true
-
+    
     while IFS= read -r line || [ -n "$line" ]; do
         if [ "$skip_header" = true ]; then
             if echo "$line" | grep -q "^@odata.context="; then
@@ -1018,12 +1019,12 @@ parse_ilorest_output() {
                 continue
             fi
         fi
-
+        
         if echo "$line" | grep -q "^@odata.context="; then
             if [ "$in_entry" = true ]; then
                 process_current_entry
             fi
-
+            
             current_event_number=""
             current_message=""
             current_created=""
@@ -1031,7 +1032,7 @@ parse_ilorest_output() {
             in_entry=true
             continue
         fi
-
+        
         if [ -z "$line" ]; then
             if [ "$in_entry" = true ]; then
                 process_current_entry
@@ -1039,7 +1040,7 @@ parse_ilorest_output() {
             in_entry=false
             continue
         fi
-
+        
         if [ "$in_entry" = true ]; then
             local event_num=$(extract_field_value "$line" "EventNumber")
             if [ -n "$event_num" ]; then
@@ -1052,32 +1053,32 @@ parse_ilorest_output() {
                 # EventNumber가 없는 서버는 RecordId를 fallback으로 사용한다.
                 current_event_number="$record_id"
             fi
-
+            
             local msg=$(extract_field_value "$line" "Message")
             if [ -n "$msg" ]; then
                 current_message="$msg"
             fi
-
+            
             local created=$(extract_field_value "$line" "Created")
             if [ -n "$created" ]; then
                 current_created="$created"
             fi
-
+            
             local severity=$(extract_field_value "$line" "Severity")
             if [ -n "$severity" ]; then
                 current_severity="$severity"
             fi
         fi
-
+        
     done < "$temp_log"
-
+    
     # 마지막 엔트리 처리
     if [ "$in_entry" = true ]; then
         process_current_entry
     fi
-
+    
     log_message "Processed new entry count: $new_entries_count"
-
+    
     if [ "$max_event_number" -gt "$last_event_number" ]; then
         save_last_event_number "$max_event_number"
         log_message "Updated last processed EventNumber/RecordId: $last_event_number -> $max_event_number"
@@ -1093,26 +1094,26 @@ analyze_ilo_logs() {
     local ilorest_end_time
     local parsing_start_time
     local parsing_end_time
-
+    
     log_message "BMC log analysis started"
-
+    
     # ilorest 명령어 실행 시간 측정
     ilorest_start_time=$(get_timestamp_ms)
-
+    
     if ! run_ilorest serverlogs --selectlog=IEL > "$temp_log" 2>/dev/null; then
         ilorest_end_time=$(get_timestamp_ms)
         local ilorest_duration=$((ilorest_end_time - ilorest_start_time))
-
+        
         log_performance "ilorest_command" "$ilorest_duration" "FAILED" "(timeout or error)"
         log_message "ERROR: ilorest command failed or timed out (${TIMEOUT_SECONDS}s)"
         check_ilo_communication_health "false"
         rm -f "$temp_log"
         return 1
     fi
-
+    
     ilorest_end_time=$(get_timestamp_ms)
     local ilorest_duration=$((ilorest_end_time - ilorest_start_time))
-
+    
     # 로그 파일 유효성 검사
     if [ ! -s "$temp_log" ]; then
         log_performance "ilorest_command" "$ilorest_duration" "FAILED" "(empty log)"
@@ -1121,7 +1122,7 @@ analyze_ilo_logs() {
         rm -f "$temp_log"
         return 1
     fi
-
+    
     # 로그 형식 검증
     if ! grep -q "^@odata.context=" "$temp_log" 2>/dev/null; then
         log_performance "ilorest_command" "$ilorest_duration" "FAILED" "(invalid format)"
@@ -1130,47 +1131,47 @@ analyze_ilo_logs() {
         rm -f "$temp_log"
         return 1
     fi
-
+    
     local total_lines=$(wc -l < "$temp_log")
     local file_size=$(stat -c%s "$temp_log" 2>/dev/null || stat -f%z "$temp_log" 2>/dev/null || echo 0)
     local log_count=$(grep -c "^@odata.context=" "$temp_log" 2>/dev/null || echo "0")
-
+    
     log_performance "ilorest_command" "$ilorest_duration" "SUCCESS" "(${log_count} logs, ${total_lines} lines, ${file_size} bytes)"
     log_message "BMC log file size: $log_count logs, $total_lines lines, $file_size bytes"
-
+    
     # 로그 파싱 시간 측정
     parsing_start_time=$(get_timestamp_ms)
-
+    
     if ! parse_ilorest_output "$temp_log"; then
         parsing_end_time=$(get_timestamp_ms)
         local parsing_duration=$((parsing_end_time - parsing_start_time))
-
+        
         log_performance "log_parsing" "$parsing_duration" "FAILED" ""
         log_message "ERROR: failed while parsing BMC logs"
         check_ilo_communication_health "false"
         rm -f "$temp_log"
         return 1
     fi
-
+    
     parsing_end_time=$(get_timestamp_ms)
     local parsing_duration=$((parsing_end_time - parsing_start_time))
-
+    
     log_performance "log_parsing" "$parsing_duration" "SUCCESS" ""
-
+    
     # 성공적으로 완료
     check_ilo_communication_health "true"
-
+    
     local end_time=$(get_timestamp_ms)
     local total_duration=$((end_time - start_time))
-
+    
     log_performance "total_analysis" "$total_duration" "SUCCESS" "(ilorest: $(format_duration $ilorest_duration), parsing: $(format_duration $parsing_duration))"
     log_message "BMC log analysis completed - total duration: $(format_duration $total_duration) (fetch: $(format_duration $ilorest_duration), parse: $(format_duration $parsing_duration))"
-
+    
     rm -f "$temp_log"
-
+    
     # 로그 정리 수행
     safe_cleanup_ilo_logs
-
+    
     return 0
 }
 
@@ -1189,25 +1190,25 @@ show_cleanup_config() {
 show_log_status() {
     if [ "$DEBUG_MODE" = "true" ]; then
         echo "=== Log file status ==="
-
+        
         for logfile in "$LOG_FILE" "$ALERT_LOG" "$PERF_LOG"; do
             if [ -f "$logfile" ]; then
                 local size=$(stat -c%s "$logfile" 2>/dev/null || echo "0")
                 local size_kb=$((size / 1024))
-
+                
                 echo "$(basename "$logfile"): ${size_kb}KB"
-
+                
                 # 백업 파일 개수 확인
                 local logdir=$(dirname "$logfile")
                 local logname=$(basename "$logfile")
                 local backup_count=$(find "$logdir" -name "${logname}.*" -type f 2>/dev/null | wc -l)
-
+                
                 if [ "$backup_count" -gt 0 ]; then
                     echo "  Backup files: ${backup_count}"
                 fi
             fi
         done
-
+        
         echo "Rotation settings: $((MAX_LOG_SIZE / 1024))KB, retention ${LOG_RETENTION_DAYS} days, max ${MAX_LOG_BACKUPS} backups"
         echo "===================="
     fi
@@ -1215,18 +1216,18 @@ show_log_status() {
 
 show_backup_status() {
     local backup_dir="${LOG_DIR}/${SCRIPT_NAME}_${MONITOR_TYPE}_backups"
-
+    
     if [ "$DEBUG_MODE" = "true" ] && [ -d "$backup_dir" ]; then
         echo "=== Backup file status ==="
-
+        
         local backup_count=$(find "$backup_dir" -name "${SCRIPT_NAME}_${MONITOR_TYPE}_logs_*.log" 2>/dev/null | wc -l)
         local backup_size_kb=$(du -sk "$backup_dir" 2>/dev/null | cut -f1)
         local backup_size_mb=$((backup_size_kb / 1024))
-
+        
         echo "Backup file count: $backup_count"
         echo "Backup directory size: ${backup_size_mb}MB"
         echo "Retention policy: ${BACKUP_RETENTION_DAYS} days, max ${MAX_BACKUP_FILES} files, max ${MAX_BACKUP_SIZE_MB}MB"
-
+        
         # 최근 5개 백업 파일 표시
         if [ "$backup_count" -gt 0 ]; then
             echo "Recent backup files:"
@@ -1238,7 +1239,7 @@ show_backup_status() {
                 echo "  $(basename "$file") (${file_size_kb}KB)"
             done
         fi
-
+        
         echo "======================"
     fi
 }
@@ -1261,13 +1262,13 @@ print_system_status() {
 show_performance_summary() {
     if [ "$DEBUG_MODE" = "true" ] && [ -f "$PERF_LOG" ]; then
         echo "=== Recent performance statistics (last 10 runs) ==="
-
+        
         # 최근 10개 ilorest 명령어 실행 시간
         echo "ilorest command execution time:"
         grep "ilorest_command.*SUCCESS" "$PERF_LOG" | tail -10 | while read line; do
             echo "  $line"
         done
-
+        
         echo "================================"
     fi
 }
@@ -1275,17 +1276,17 @@ show_performance_summary() {
 # 수동 로그 정리 함수
 clear_ilo_logs() {
     local log_type="${1:-IEL}"
-
+    
     log_message "BMC $log_type log clear started"
-
+    
     if run_ilorest serverlogs --selectlog="$log_type" --clearlog 2>/dev/null; then
         log_message "BMC $log_type log clear completed"
         send_alert "BMC-CLEANUP-002" "iLO $log_type log was manually cleared"
-
+        
         # 상태 파일 초기화 (EventNumber 리셋)
         save_last_event_number "0"
         log_message "EventNumber state reset"
-
+        
         return 0
     else
         log_message "ERROR: failed to clear iLO $log_type log"
@@ -1324,9 +1325,9 @@ main() {
             exit $?
             ;;
     esac
-
+    
     acquire_lock
-
+    
     mkdir -p "$LOG_DIR" 2>/dev/null
     mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null
     mkdir -p "$(dirname "$HEALTH_STATE_FILE")" 2>/dev/null
@@ -1334,34 +1335,34 @@ main() {
     chmod 700 "$TEMP_DIR" 2>/dev/null
 
     cleanup_stale_ilorest_tmp
-
-    if ! command -v ilorest >/dev/null 2>&1; then
+    
+    if ! command -v "$ILOREST" >/dev/null 2>&1; then
         log_message "ERROR: ilorest command not found"
         send_alert "BMC-SYS-001" "iLO monitoring system error - ilorest command not found"
         exit 1
     fi
-
+    
     if ! command -v timeout >/dev/null 2>&1; then
         log_message "WARNING: timeout command not found. Timeout handling will be disabled."
         TIMEOUT_SECONDS=0
     fi
-
+    
     local ilorest_version
     ilorest_version=$(run_ilorest -V 2>/dev/null | head -1)
     log_message "Using ilorest version: $ilorest_version"
-
+    
     show_cleanup_config
     show_log_status
     show_backup_status
     print_system_status
-
+    
     local last_event_number=$(get_last_event_number)
     if [ "$last_event_number" = "0" ]; then
         initialize_state
     else
         analyze_ilo_logs
     fi
-
+    
     print_system_status
     show_performance_summary
     log_message "BMC log analysis completed"
