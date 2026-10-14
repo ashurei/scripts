@@ -2,11 +2,11 @@
 ########################################################
 # Description : Setup convergence security
 # Create DATE : 2026.09.07
-# Last Update DATE : 2026.10.12 by ashurei
+# Last Update DATE : 2026.10.14 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.10.12.r03"
+SCRIPT_VER="2026.10.14.r01"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -319,7 +319,7 @@ echo "[OK] Execute cron script is succeeded."
 
 ### port_disable script
 echo "[INFO] Execute port_disable script : ${DST_RUN_SCRIPT}"
-run_cmd "$DST_RUN_SCRIPT" --apply
+run_cmd "$DST_RUN_SCRIPT" --apply --dir "$BMC_DIR"
 
 sleep 2
 echo "[OK] Execute port_disable is succeeded."
