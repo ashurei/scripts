@@ -2,11 +2,11 @@
 ########################################################
 # Description : Setup convergence security
 # Create DATE : 2026.09.07
-# Last Update DATE : 2026.10.14 by ashurei
+# Last Update DATE : 2026.10.20 by ashurei
 # Copyright (c) ashurei@sktelecom.com, 2026
 ########################################################
 
-SCRIPT_VER="2026.10.14.r01"
+SCRIPT_VER="2026.10.20.r02"
 
 # ========================================================================================== #
 # Pre install configuration
@@ -184,12 +184,12 @@ CURRENT_STEP=1
 ### Uncompress racadm files in Dell
 if [ "$VENDOR" = "DELL" ]; then
     if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
-        RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"                
+        RACADM_ARCHIVE="${BASE_DIR}/${RACADM_TAR_FILE}"
         RACADM_TMP_DIR="${BASE_DIR}/temp_racadm"
         RACADM_INSTALL="${RACADM_TMP_DIR}/iDRACTools/racadm/install_racadm.sh"
 
         [ -f "$RACADM_ARCHIVE" ] || exit_with_error 1 "racadm archive is not found: $RACADM_ARCHIVE"
-        
+
         run_cmd rm -rf "$RACADM_TMP_DIR"
         run_cmd mkdir -p "$RACADM_TMP_DIR"
         run_cmd tar xfz "$RACADM_ARCHIVE" -C "$RACADM_TMP_DIR"
@@ -199,7 +199,7 @@ if [ "$VENDOR" = "DELL" ]; then
             if [ ! -x "$RACADM_INSTALL" ]; then
                 run_cmd chmod +x "$RACADM_INSTALL"
             fi
-                
+
             if (cd "${RACADM_TMP_DIR}/iDRACTools/racadm" && ./install_racadm.sh); then
                 echo "[OK] racadm installation completed."
             else
@@ -207,7 +207,7 @@ if [ "$VENDOR" = "DELL" ]; then
                 exit_with_error "$rc" "racadm install script failed."
             fi
     fi
-    
+
     # Post check
     if ! rpm -q "$RACADM_PACKAGE" >/dev/null 2>&1; then
         exit_with_error 1 "$RACADM_PACKAGE is not installed."
@@ -225,9 +225,21 @@ then
     exit_with_error 1 "No BMC RPM files: $RPM_DIR"
 fi
 
-### Perform net-snmp, net-snmp-agent-libs
-if rpm -q net-snmp net-snmp-agent-libs > /dev/null 2>&1; then
-    RPM_FILES+=("${RPM_DIR}/extra/net-snmp-*.rpm")
+# Perform net-snmp
+if rpm -q net-snmp > /dev/null 2>&1; then
+    RPM_FILES+=("${RPM_DIR}"/extra/net-snmp-[0-9]*.rpm)
+fi
+# Perform net-snmp-agent-libs
+if rpm -q net-snmp-agent-libs > /dev/null 2>&1; then
+    RPM_FILES+=("${RPM_DIR}"/extra/net-snmp-agent-libs-[0-9]*.rpm)
+fi
+# Perform net-snmp-utils
+if rpm -q net-snmp-utils > /dev/null 2>&1; then
+    RPM_FILES+=("${RPM_DIR}"/extra/net-snmp-utils-[0-9]*.rpm)
+fi
+# Perform net-snmp-devel
+if rpm -q net-snmp-devel > /dev/null 2>&1; then
+    RPM_FILES+=("${RPM_DIR}"/extra/net-snmp-devel-[0-9]*.rpm)
 fi
 
 yum install -y --disablerepo='*' "${RPM_FILES[@]}" || true
